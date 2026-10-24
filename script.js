@@ -2763,8 +2763,221 @@
     },
   };
 
+  /* ---------- Cena IX · Highlands (Eilean Donan, Loch Duich, Escócia) ---------- */
+
+  /** Bloco de alvenaria: papel, tijolos riscados, sombra à direita e janelas. */
+  function masonry(pen, x0, y0, w, h, o = {}) {
+    const c = pen.c, S = pen.S, k = pen.k;
+    c.fillStyle = PAL.paper;
+    c.fillRect(x0, y0, w, h);
+    const bricks = [], shade = [];
+    for (let y = y0 + 3 * k; y < y0 + h; y += 3.5 * k) {
+      let x = x0 + S() * 4 * k;
+      while (x < x0 + w - 2) { const L = (3 + S() * 4) * k; if (S() < 0.45) bricks.push([x, y, Math.min(x0 + w, x + L), y]); x += L + 2 * k; }
+    }
+    if (o.shade) for (let x = x0 + w * (1 - o.shade); x < x0 + w; x += 1.6 * k) shade.push([x, y0, x, y0 + h]);
+    pen.lines(bricks, { w: 0.5, col: PAL.g2, a: 0.7, wob: 0.2 });
+    pen.lines(shade, { w: 0.55, col: PAL.g1, a: 0.5, wob: 0.2 });
+    c.fillStyle = PAL.ink;
+    for (const [wx, wy] of o.windows || []) c.fillRect(x0 + wx * w - 1.2 * k, y0 + wy * h, 2.4 * k, 4 * k);
+    if (o.battlements) {
+      const mw = 4 * k;
+      c.fillStyle = PAL.paper;
+      for (let x = x0; x < x0 + w - mw * 0.5; x += mw * 2) {
+        c.fillRect(x, y0 - mw, mw, mw);
+        pen.path([[x, y0], [x, y0 - mw], [x + mw, y0 - mw], [x + mw, y0]], { w: 0.8, col: PAL.ink, passes: 1, jit: 0.1 });
+      }
+    }
+    pen.path([[x0, y0 + h], [x0, y0], [x0 + w, y0], [x0 + w, y0 + h]], { w: 1, col: PAL.ink, passes: 2, jit: 0.25 });
+  }
+
+  /** Ovelha pastando: corpo de lã em bolinhas, cabeça e patas escuras. */
+  function sheep(pen, x, y, s, dir = 1) {
+    const c = pen.c;
+    pen.lines([[x - 4 * s, y - 2 * s, x - 4.3 * s, y], [x - 2 * s, y - 2 * s, x - 2 * s, y], [x + 2.5 * s, y - 2 * s, x + 2.8 * s, y], [x + 4 * s, y - 2 * s, x + 4 * s, y]], { w: 1.1, col: PAL.ink, wob: 0.1 });
+    const pts = [];
+    for (let a = 0; a <= TAU + 0.05; a += 0.15) {
+      const r = 1 + 0.12 * Math.abs(Math.sin(a * 6));
+      pts.push([x + Math.cos(a) * 6.5 * s * r, y - 5 * s + Math.sin(a) * 3.6 * s * r]);
+    }
+    const p = new Path2D();
+    pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+    c.fillStyle = PAL.paper;
+    c.fill(p);
+    pen.path(pts, { w: 0.8, col: PAL.ink, passes: 1, jit: 0.15 });
+    c.fillStyle = PAL.ink;
+    c.beginPath();
+    c.ellipse(x + dir * 7 * s, y - 3.4 * s, 2.3 * s, 1.5 * s, dir * 0.6, 0, TAU);
+    c.fill();
+  }
+
+  const Highlands = {
+    id: 'highlands',
+    numeral: 'IX',
+    place: 'Eilean Donan, Loch Duich',
+    meta: 'Escócia · 57°16′N 5°31′W',
+    mood: 'melancólica, chuvosa',
+    duration: 28,
+    stopAt: 0.36,
+    stopAtPortrait: 0.4,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hf = portrait ? 0.85 : 1, wf = portrait ? clamp(H / W / 1.4, 1, 1.6) : 1;
+      const wY = H * (portrait ? 0.6 : 0.62), bottomWater = H * 0.87, depth = bottomWater - wY;
+      const nF = noise1(rng(9101)), nM = noise1(rng(9102)), nB = noise1(rng(9103));
+      const far = (x) => {
+        const u = x / W;
+        return wY - H * hf * (0.12 + 0.1 * bell(u, 0.5, 0.18 * wf) + 0.07 * bell(u, 0.85, 0.1 * wf) + 0.015 * fbm(nF, u * 10));
+      };
+      const midL = (x) => {
+        const u = x / W;
+        return Math.min(wY + 2, wY - H * hf * (0.03 + 0.22 * Math.pow(1 - smooth(0, 0.45, u), 1.3) + 0.01 * fbm(nM, u * 14)));
+      };
+      const midR = (x) => {
+        const u = x / W;
+        return Math.min(wY + 2, wY - H * hf * (0.02 + 0.2 * Math.pow(smooth(0.66, 1.05, u), 1.1) + 0.01 * fbm(nM, u * 14 + 5)));
+      };
+      const bankY = (x) => H * (portrait ? 0.85 : 0.84) + H * 0.01 * Math.sin((x / W) * 2.2 + 0.2) + H * 0.007 * fbm(nB, x * 0.01);
+      const trailY = (x) => bankY(x) + H * 0.035;
+      const farPts = sample(-6, W + 6, 3, far), lPts = sample(-6, W * 0.5, 3, midL), rPts = sample(W * 0.62, W + 6, 3, midR);
+      const cX = W * (portrait ? 0.58 : 0.6), cs = Math.max(Math.min(W, H) / 900, 0.6);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 9150, 9151, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.005, H * 0.5, 1);
+        skyStrokes(pen, W, H * 0.005, H * 0.25, 0.9);
+        waterStrokes(pen, W, wY, bottomWater, 1.2);
+      }
+      const clouds = makeClouds(9160, 4, W, H, k, res, { y0: 0.02, dy: 0.06, speed: 7, size: Math.min(W * 0.36, H * 0.6) });
+      const mist = { L: mistSprite(9170, Math.ceil(W * 1.5), Math.ceil(H * 0.1), 80), y: wY - H * 0.07, v: 10 * k, a: 0.8 };
+      const mistHi = { L: mistSprite(9171, Math.ceil(W * 1.5), Math.ceil(H * 0.08), 50), y: wY - H * 0.25, v: 14 * k, a: 0.6 };
+      const ripples = makeRipples(9180, 220, W, wY, depth, k);
+      const rain = makeParticles(9190, portrait ? 160 : 280);
+      const rings = makeParticles(9191, 50);
+
+      const st = { W, H, land: [], fg: [], wind: 1.6 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res);
+        const pen = new Pencil(land.c, 9200, seedJ, k), S = pen.S;
+        drawRange(pen, {
+          pts: farPts, base: wY + 1, fill: '#ECE5D7', hatchCol: PAL.g2, hatchA: 0.5, fallA: 0.4,
+          fallEvery: 2, fallDensity: 0.5, hatchEvery: 1, hatchFrom: 0.42, crossFrom: 0.8, strata: 3, maxFall: H * 0.06,
+          lineW: 0.9, lineCol: PAL.g2, lineA: 0.9,
+          shade: (x, y, sl) => 0.35 + 0.4 * Math.tanh(sl * 2) + 0.25 * nF(x * 0.02),
+        });
+        const mid = (pts) => drawRange(pen, {
+          pts, base: wY + 1, fill: '#E6DDCC', hatchCol: PAL.g1, hatchA: 0.55, fallA: 0.45,
+          fallEvery: 1, fallDensity: 0.7, hatchEvery: 1, hatchFrom: 0.4, crossFrom: 0.72, strata: 4, maxFall: H * 0.07, maxHatch: H * 0.1,
+          bandH: H * 0.03, bandA: 0.4, forest: 0.25, lineW: 1.15, lineCol: PAL.ink, lineA: 0.95,
+          shade: (x, y, sl) => 0.45 + 0.35 * Math.tanh(sl * 2) + 0.25 * nM(x * 0.02),
+        });
+        mid(lPts);
+        mid(rPts);
+        for (const [i, sx] of [W * 0.82, W * 0.87, W * 0.92].entries()) sheep(pen, sx, midR(sx) + H * (0.05 + i * 0.012), 1.2 * k, i % 2 ? 1 : -1);
+
+        // ilhota, ponte de arcos e o castelo
+        const u = 2.1 * cs * k, gy = wY - 5 * u;
+        const isl = [];
+        for (let a = Math.PI; a <= TAU + 0.01; a += 0.15) isl.push([cX + Math.cos(a) * 44 * u, wY + 2 + Math.sin(a) * 8 * u]);
+        const ip = new Path2D();
+        isl.forEach((q, i) => (i ? ip.lineTo(q[0], q[1]) : ip.moveTo(q[0], q[1])));
+        land.c.fillStyle = '#E3DAC8';
+        land.c.fill(ip);
+        pen.path(isl, { w: 1, col: PAL.ink, passes: 1 });
+        masonry(pen, cX - 62 * u * 0.5 - 40 * u * 0.4, gy - 30 * u, 44 * u, 30 * u, { shade: 0.2, windows: [[0.2, 0.3], [0.5, 0.3], [0.8, 0.3]], battlements: true });
+        masonry(pen, cX + 8 * u, gy - 24 * u, 26 * u, 24 * u, { shade: 0.45, windows: [[0.5, 0.35]], battlements: true });
+        masonry(pen, cX - 14 * u, gy - 52 * u, 28 * u, 52 * u, { shade: 0.35, windows: [[0.3, 0.2], [0.7, 0.2], [0.5, 0.55]], battlements: true });
+        // ponte em arcos até a margem esquerda
+        const bx0 = cX - 62 * u * 0.5 - 40 * u * 0.4 - 2, bx1 = bx0 - Math.max(W * 0.14, 80 * u), by = wY - 9 * u;
+        land.c.fillStyle = PAL.paper;
+        land.c.fillRect(bx1, by, bx0 - bx1, wY - by + 1);
+        const arches = 3, aw = (bx0 - bx1) / arches, ar = Math.min(aw * 0.32, (wY - by) * 0.55);
+        land.c.fillStyle = PAL.paper2;
+        for (let i = 0; i < arches; i++) {
+          const ax = bx1 + aw * (i + 0.5);
+          land.c.beginPath();
+          land.c.moveTo(ax - ar, wY + 1);
+          land.c.lineTo(ax - ar, wY - ar * 0.6);
+          land.c.arc(ax, wY - ar * 0.6, ar, Math.PI, TAU);
+          land.c.lineTo(ax + ar, wY + 1);
+          land.c.closePath();
+          land.c.fill();
+          const arc = [];
+          for (let a = Math.PI; a <= TAU + 0.01; a += 0.2) arc.push([ax + Math.cos(a) * ar, wY - ar * 0.6 + Math.sin(a) * ar]);
+          pen.path([[ax - ar, wY], ...arc, [ax + ar, wY]], { w: 0.8, col: PAL.ink, passes: 1, jit: 0.2 });
+        }
+        pen.path([[bx1 - 4, by], [bx0, by]], { w: 1.1, col: PAL.ink, passes: 2, jit: 0.2 });
+        pen.path(sample(-4, W + 4, 6, () => wY), { w: 0.9, col: PAL.g1, a: 0.8, gap: 0.08, jit: 0.5 });
+        st.land.push(land);
+
+        // primeiro plano: urze, muro de pedra seca
+        const fg = makeLayer(W, H, res);
+        const pf = new Pencil(fg.c, 9300, seedJ + 5, k), S2 = pf.S;
+        drawBank(pf, W, H, bankY, trailY, { rocks: 0, tone: 1.2 });
+        const wallEnd = W * (portrait ? 0.3 : 0.32);
+        for (let row = 0; row < 3; row++) {
+          for (let x = -10; x < wallEnd; x += (9 + S2() * 6) * k) {
+            rock(pf, x + row * 4 * k, bankY(x) + 2 * k - row * 6 * k, (4 + S2() * 2) * k);
+          }
+        }
+        for (let i = 0; i < (portrait ? 7 : 12); i++) {
+          const x = wallEnd + 20 * k + S2() * (W - wallEnd), r = (8 + S2() * 12) * k;
+          bush(pf, x, bankY(x) + r * 0.5 + S2() * 10 * k, r);
+        }
+        st.fg.push(fg);
+      });
+
+      st.ground = trailY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        drawClouds(ctx, clouds, t, W);
+        ctx.drawImage(land.cv, 0, 0, W, H);
+        drawMist(ctx, mistHi, t);
+        reflect(ctx, land, wY, depth, t, k, { alpha: 0.36, amp: 1.4, speed: 1.6 });
+        drawRipples(ctx, ripples, t, W, k, { speed: 1.6, chop: 0.4 });
+        ctx.beginPath();
+        for (const p of rings) {
+          const cyc = t / 1.1 + p.ph, n = Math.floor(cyc), f = cyc - n;
+          const x = wrap(p.x + n * 0.618, 1) * W, y = wY + 6 + wrap(p.y + n * 0.381, 1) * (depth - 10);
+          const d = (y - wY) / depth, r = f * 6 * k * (0.5 + d);
+          ctx.moveTo(x + r, y);
+          ctx.ellipse(x, y, r, r * 0.3, 0, 0, TAU);
+        }
+        ctx.strokeStyle = PAL.g1;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 0.7 * k;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        drawMist(ctx, mist, t);
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+
+        // chuva oblíqua, empurrada pelo vento
+        ctx.beginPath();
+        for (const p of rain) {
+          const vv = (420 + p.v * 280) * k, L = (10 + p.s * 10) * k;
+          const y = wrap(p.y * (H + 40) + t * vv, H + 40) - 20;
+          const x = wrap(p.x * (W + 120) + t * vv * 0.45, W + 120) - 60;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + L * 0.45, y + L);
+        }
+        ctx.strokeStyle = PAL.g1;
+        ctx.globalAlpha = 0.38;
+        ctx.lineWidth = 0.75 * k;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna, Cappadocia];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna, Cappadocia, Highlands];
 
   /*<T>*/
   /* ================================================================
