@@ -2976,8 +2976,184 @@
     },
   };
 
+  /* ---------- Cena X · Lençóis Maranhenses (Maranhão, Brasil) ---------- */
+
+  /** Lagoa entre dunas: oval rasa, riscos de água e margem fina. */
+  function lagoon(pen, x, y, rx, ry) {
+    const c = pen.c, S = pen.S, pts = [];
+    for (let a = 0; a <= TAU + 0.05; a += 0.12) pts.push([x + Math.cos(a) * rx * (1 + 0.08 * Math.sin(a * 3 + x)), y + Math.sin(a) * ry]);
+    const p = new Path2D();
+    pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+    c.fillStyle = PAL.paper2;
+    c.fill(p);
+    c.save();
+    c.clip(p);
+    const L = [];
+    for (let yy = y - ry; yy < y + ry; yy += 2.6 * pen.k) {
+      let xx = x - rx;
+      while (xx < x + rx) { const len = 10 + S() * 40; if (S() < 0.6) L.push([xx, yy, xx + len, yy + (S() - 0.5)]); xx += len + S() * 20; }
+    }
+    pen.lines(L, { w: 0.55, col: PAL.g2, a: 0.6 });
+    c.restore();
+    pen.path(pts, { w: 0.8, col: PAL.g1, a: 0.8, passes: 1, gap: 0.05 });
+    return { x, y, rx, ry };
+  }
+
+  const Lencois = {
+    id: 'lencois',
+    numeral: 'X',
+    place: 'Lençóis Maranhenses',
+    meta: 'Brasil · 2°29′S 43°07′W',
+    mood: 'luminosa, aberta',
+    duration: 28,
+    stopAt: 0.5,
+    stopAtPortrait: 0.5,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hY = H * (portrait ? 0.52 : 0.5);
+      const soft = (seed, n, hMin, hMax) => randomDunes(seed, n, W, H, hMin, hMax, 0.22, 0.12);
+      const layers = [
+        { list: soft(10101, portrait ? 6 : 8, 0.015, 0.035), base: hY + 1 },
+        { list: soft(10102, portrait ? 4 : 6, 0.03, 0.06), base: H * 0.6 },
+        { list: soft(10103, portrait ? 3 : 4, 0.04, 0.08), base: H * 0.7 },
+      ].map((l) => ({ ...l, f: duneField(l.list, l.base) }));
+      const nearL = [{ c: W * 0.3, h: H * 0.09, wl: W * 0.5, wr: W * 0.4 }, { c: W * 0.95, h: H * 0.1, wl: W * 0.45, wr: W * 0.3 }];
+      const near = duneField(nearL, H * 0.92);
+      const nearPts = sample(-6, W + 6, 3, near);
+      const nD = noise1(rng(10104));
+      const pools = [];
+      {
+        const r = rng(10105);
+        layers.forEach((l, i) => {
+          const n = portrait ? 2 : 3;
+          for (let j = 0; j < n; j++) {
+            const x = W * ((j + 0.3 + r() * 0.4) / n), rx = W * (0.05 + i * 0.03) * (0.7 + r() * 0.6) * (portrait ? 1.5 : 1);
+            const nextBase = i + 1 < layers.length ? layers[i + 1].base : H * 0.8;
+            pools.push({ layer: i, x, y: l.base + (nextBase - l.base) * 0.5, rx, ry: H * (0.006 + i * 0.004) });
+          }
+        });
+      }
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 10150, 10151, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.01, H * 0.18, 0.25);
+      }
+      const clouds = makeClouds(10160, 3, W, H, k, res, { y0: 0.08, dy: 0.08, speed: 6, size: Math.min(W * 0.32, H * 0.5) });
+      const birds = makeBirds(10190, 5, W, H, 0.22, 0.4, k, { size: 4, speed: 18 });
+      const glints = makeParticles(10180, 70);
+      // sombra de nuvem: mancha suave que escurece as dunas por onde passa
+      const shadow = (() => {
+        const w = Math.ceil(Math.min(W * 0.5, H * 0.7)), h = Math.ceil(w * 0.22), L = makeLayer(w, h, 1), c = L.c;
+        c.save();
+        c.translate(w / 2, h / 2);
+        c.scale(w / h, 1);
+        const g = c.createRadialGradient(0, 0, 0, 0, 0, h / 2);
+        g.addColorStop(0, 'rgba(90,83,76,0.16)');
+        g.addColorStop(1, 'rgba(90,83,76,0)');
+        c.fillStyle = g;
+        c.beginPath();
+        c.arc(0, 0, h / 2, 0, TAU);
+        c.fill();
+        c.restore();
+        return L;
+      })();
+
+      const st = { W, H, land: [], fg: [], wind: 1 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res);
+        const pen = new Pencil(land.c, 10200, seedJ, k);
+        layers.forEach((l, i) => {
+          drawRange(pen, {
+            pts: sample(-6, W + 6, 3, l.f), base: H + 4, fill: PAL.paper, hatchCol: i ? PAL.g2 : PAL.g3, hatchA: 0.5, fallA: 0.3,
+            fallEvery: 3, fallDensity: 0.15, hatchEvery: 1, hatchFrom: 0.4, crossFrom: 0.95, strata: 3 + i * 2, maxFall: H * 0.03, maxHatch: H * 0.04,
+            lineW: 0.8 + i * 0.15, lineCol: i ? PAL.g1 : PAL.g2, lineA: 0.9,
+            shade: (x, y, sl) => 0.02 + 0.9 * smooth(0.03, 0.3, sl) + 0.08 * nD(x * 0.02),
+          });
+          for (const p of pools) if (p.layer === i) lagoon(pen, p.x, p.y, p.rx, p.ry);
+        });
+        st.land.push(land);
+
+        const fg = makeLayer(W, H, res), c = fg.c;
+        const pf = new Pencil(c, 10300, seedJ + 5, k), S = pf.S;
+        const poly = new Path2D();
+        poly.moveTo(-6, H + 6);
+        nearPts.forEach((p) => poly.lineTo(p[0], p[1]));
+        poly.lineTo(W + 6, H + 6);
+        poly.closePath();
+        c.fillStyle = PAL.paper;
+        c.fill(poly);
+        c.save();
+        c.clip(poly);
+        const hatch = [], marks = [];
+        for (let i = 1; i < nearPts.length - 1; i++) {
+          const [x, y] = nearPts[i];
+          const sl = (nearPts[i + 1][1] - nearPts[i - 1][1]) / 6, s = smooth(0.03, 0.25, sl);
+          if (s > 0.2) { const L = (H - y) * (0.3 + S() * 0.5) * s; hatch.push([x, y + 1, x - L * 0.35, y + 1 + L]); }
+        }
+        for (let i = 0; i < (portrait ? 80 : 140); i++) {
+          const x = S() * W, top = near(x), y = top + 8 * k + S() * (H - top) * 0.9;
+          const sl = (near(x + 3) - near(x - 3)) / 6;
+          if (sl > 0.05) continue;
+          const len = (16 + S() * 34) * k, seg = [];
+          for (let j = 0; j <= 8; j++) { const f = j / 8; seg.push([x + f * len, y + f * len * sl * 0.8 - Math.sin(f * Math.PI) * 1.4 * k]); }
+          marks.push(seg);
+        }
+        pf.lines(hatch, { w: 0.65, col: PAL.g1, a: 0.4 });
+        for (const m of marks) pf.path(m, { w: 0.6, col: PAL.g2, a: 0.6, passes: 1, gap: 0, jit: 0.3 });
+        c.restore();
+        pf.path(nearPts, { w: 1.2, col: PAL.g1, a: 0.95, gap: 0.02, jit: 0.4 });
+        st.fg.push(fg);
+      });
+
+      st.ground = (x) => near(x) + 2 * k;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        drawClouds(ctx, clouds, t, W);
+        drawBirds(ctx, birds, t, W, k, 1);
+        ctx.drawImage(land.cv, 0, 0, W, H);
+
+        // brilhos nas lagoas
+        ctx.beginPath();
+        glints.forEach((g, i) => {
+          const p = pools[i % pools.length];
+          const a = Math.sin(t * (1.2 + g.v) + g.ph);
+          if (a < 0.2) return;
+          const x = p.x + (g.x - 0.5) * p.rx * 1.6, y = p.y + (g.y - 0.5) * p.ry * 1.2, L = (3 + a * 6) * k;
+          ctx.moveTo(x - L / 2, y);
+          ctx.lineTo(x + L / 2, y);
+        });
+        ctx.strokeStyle = PAL.paper;
+        ctx.lineWidth = 1.4 * k;
+        ctx.stroke();
+
+        // sombras das nuvens deslizando sobre as dunas
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, hY, W, H - hY);
+        ctx.clip();
+        clouds.forEach((cl, i) => {
+          const span = W + cl.w * 2;
+          const x = wrap(cl.x0 + t * cl.v, span) - cl.w + cl.w * 0.1;
+          const y = hY + (H - hY) * (0.12 + i * 0.22);
+          const sw = shadow.w * (0.8 + i * 0.25), sh = shadow.h * (0.8 + i * 0.25);
+          ctx.drawImage(shadow.cv, x, y, sw, sh);
+        });
+        ctx.restore();
+
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna, Cappadocia, Highlands];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna, Cappadocia, Highlands, Lencois];
 
   /*<T>*/
   /* ================================================================
