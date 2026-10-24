@@ -2269,8 +2269,295 @@
     },
   };
 
+  /* ---------- Cena VII · Savana (Amboseli, Quênia, com o Kilimanjaro) ---------- */
+
+  /** Acácia guarda-chuva: tronco que se abre em leque, copa achatada com sombra embaixo. */
+  function acacia(pen, x, baseY, h, w) {
+    const c = pen.c, S = pen.S, k = pen.k;
+    const topY = baseY - h, canH = Math.max(h * 0.16, 10 * k), forkY = baseY - h * 0.42;
+    const trunk = [[x - 2 * k, baseY, x - 1 * k, forkY], [x + 2.5 * k, baseY, x + 2 * k, forkY]];
+    const br = [];
+    for (let i = 0; i < 6; i++) {
+      const tx = x - w * 0.42 + (i / 5) * w * 0.84 + (S() - 0.5) * w * 0.06;
+      const mx = (x + tx) / 2 + (S() - 0.5) * w * 0.08, my = forkY - (forkY - topY) * (0.45 + S() * 0.2);
+      br.push([x, forkY, mx, my], [mx, my, tx, topY + canH * 0.8]);
+    }
+    pen.lines(trunk, { w: Math.max(2, h * 0.012), col: PAL.ink });
+    pen.lines(br, { w: Math.max(1.3, h * 0.006), col: PAL.ink, a: 0.95 });
+    for (let L = 0; L < 2; L++) {
+      const cy = topY + L * canH * 0.45, cw = w * (1 - L * 0.15), pts = [];
+      for (let i = 0; i <= 40; i++) {
+        const f = i / 40;
+        pts.push([x - cw / 2 + f * cw, cy - canH * 0.4 * Math.pow(Math.sin(f * Math.PI), 0.5) - Math.abs(Math.sin(f * 15 + L)) * 3 * k]);
+      }
+      for (let i = 40; i >= 0; i--) {
+        const f = i / 40;
+        pts.push([x - cw / 2 + f * cw, cy + canH * 0.25 + Math.sin(f * 11 + L) * 1.5 * k]);
+      }
+      const p = new Path2D();
+      pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+      p.closePath();
+      c.fillStyle = '#E3D9C6';
+      c.fill(p);
+      foliage(pen, p, x - cw / 2, x + cw / 2, cy - canH * 0.45, cy + canH * 0.3, Math.round((cw * canH) / (14 * k * k)), PAL.g1, 0.55);
+      c.save();
+      c.clip(p);
+      const us = [];
+      for (let xx = x - cw / 2; xx < x + cw / 2; xx += 1.7 * k) us.push([xx, cy + canH * 0.3, xx + 3 * k, cy - canH * 0.02]);
+      pen.lines(us, { w: 0.6, col: PAL.ink, a: 0.6 });
+      c.restore();
+      pen.path(pts, { w: 1, col: PAL.ink, passes: 1, jit: 0.3, close: true });
+    }
+  }
+
+  /** Girafa parada, de perfil, com manchas. */
+  function giraffe(pen, x, y, s, dir = 1) {
+    const c = pen.c, S = pen.S;
+    c.save();
+    c.translate(x, y);
+    c.scale(dir * s, s);
+    c.lineCap = 'round';
+    c.strokeStyle = PAL.ink;
+    c.lineWidth = 1.3;
+    c.beginPath();
+    for (const [x0, y0, x1] of [[-6, -18, -7], [-4, -18, -3.5], [6, -21, 6.5], [8, -21, 9]]) { c.moveTo(x0, y0); c.lineTo(x1, 0); }
+    c.stroke();
+    const body = new Path2D();
+    body.moveTo(-9, -22);
+    body.quadraticCurveTo(0, -28, 9, -29);
+    body.lineTo(11, -31);
+    body.lineTo(15, -50);
+    body.lineTo(17.5, -52);
+    body.lineTo(22, -50.5);
+    body.lineTo(21.5, -48.8);
+    body.lineTo(17.5, -48.5);
+    body.lineTo(14, -30);
+    body.quadraticCurveTo(12, -21, 8, -19);
+    body.quadraticCurveTo(0, -17, -8, -17);
+    body.quadraticCurveTo(-10, -19, -9, -22);
+    body.closePath();
+    c.fillStyle = PAL.paper;
+    c.fill(body);
+    c.save();
+    c.clip(body);
+    c.fillStyle = PAL.g1;
+    for (let i = 0; i < 26; i++) {
+      const px = -8 + S() * 22, py = -52 + S() * 35, r = 0.9 + S() * 1.2;
+      c.beginPath();
+      c.ellipse(px, py, r * 1.2, r, S() * 3, 0, TAU);
+      c.fill();
+    }
+    c.restore();
+    c.lineWidth = 0.8;
+    c.stroke(body);
+    c.beginPath();
+    c.moveTo(17, -52);
+    c.lineTo(16.6, -55);
+    c.moveTo(18.4, -52.2);
+    c.lineTo(18.4, -55.2);
+    c.moveTo(-9, -21);
+    c.quadraticCurveTo(-12, -16, -11, -12);
+    c.stroke();
+    c.restore();
+  }
+
+  /** Elefante andando (desenhado de frente para a direita; dir = -1 espelha). */
+  function drawElephant(ctx, x, y, sc, ph, pat, k, dir = -1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir * sc, sc);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = PAL.ink;
+    ctx.lineWidth = (1.1 * k) / sc;
+    ctx.fillStyle = pat;
+    for (const [lx, o] of [[-11, 0], [-6, Math.PI], [9, Math.PI], [13, 0]]) {
+      const sw = Math.sin(ph + o) * 2.6, lift = Math.max(0, Math.sin(ph + o)) * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(lx - 2.7, -16);
+      ctx.lineTo(lx - 2.6 + sw, -0.5 - lift);
+      ctx.lineTo(lx + 2.6 + sw, -0.5 - lift);
+      ctx.lineTo(lx + 2.7, -16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(1, -22, 17, 10.5, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(13, -30);
+    ctx.quadraticCurveTo(24, -35, 25, -24);
+    ctx.quadraticCurveTo(27, -14, 25 + Math.sin(ph * 0.5) * 1.5, -5);
+    ctx.quadraticCurveTo(24.5, -1, 26.5 + Math.sin(ph * 0.5) * 1.5, 0);
+    ctx.lineTo(23 + Math.sin(ph * 0.5), -1);
+    ctx.quadraticCurveTo(21.5, -10, 19.5, -16);
+    ctx.quadraticCurveTo(15, -14, 12, -17);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(14, -24, 5.5, 8.5, -0.15, 0, TAU);
+    ctx.fillStyle = PAL.g2;
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(21, -15);
+    ctx.quadraticCurveTo(25, -11.5, 28.5, -14);
+    ctx.strokeStyle = PAL.paper;
+    ctx.lineWidth = (2.2 * k) / sc;
+    ctx.stroke();
+    ctx.strokeStyle = PAL.ink;
+    ctx.lineWidth = (0.6 * k) / sc;
+    ctx.stroke();
+    ctx.lineWidth = (1 * k) / sc;
+    ctx.beginPath();
+    ctx.moveTo(-16, -24);
+    ctx.quadraticCurveTo(-19 + Math.sin(ph) * 1.5, -18, -18, -12);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const Savanna = {
+    id: 'savana',
+    numeral: 'VII',
+    place: 'Amboseli',
+    meta: 'Quênia · 2°39′S 37°15′E',
+    mood: 'quente, ampla',
+    duration: 30,
+    stopAt: 0.4,
+    stopAtPortrait: 0.38,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hf = portrait ? 0.8 : 1, wf = portrait ? clamp(H / W / 1.4, 1, 1.7) : 1;
+      const hY = H * (portrait ? 0.62 : 0.64);
+      const nK = noise1(rng(7101)), nB = noise1(rng(7102));
+      const kili = (x) => {
+        const u = x / W;
+        const dome = Math.min(1, bell(u, portrait ? 0.4 : 0.32, 0.2 * wf) * 1.35);
+        return hY + 1 - H * hf * (0.012 + 0.2 * dome + 0.006 * ridged(nK, u * 25) * dome);
+      };
+      const bankY = (x) => H * (portrait ? 0.85 : 0.84) + H * 0.01 * Math.sin((x / W) * 2.5 + 0.8) + H * 0.006 * fbm(nB, x * 0.01);
+      const trailY = (x) => bankY(x) + H * 0.035;
+      const kiliPts = sample(-6, W + 6, 3, kili);
+      const herdY = H * (portrait ? 0.74 : 0.75);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 7150, 7151, k), S = pen.S;
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.01, H * 0.3, 0.45);
+        sunDisc(pen, W * (portrait ? 0.62 : 0.64), hY - H * 0.2, Math.min(W, H) * 0.11, 3);
+        const L = [];
+        for (let y = hY + 2; y < H; y += 4 * k) {
+          let x = -10;
+          while (x < W) { const len = 15 + S() * 70; if (S() < 0.4) L.push([x, y, x + len, y + (S() - 0.5)]); x += len + S() * 40; }
+        }
+        pen.lines(L, { w: 0.55, col: PAL.g2, a: 0.4 });
+      }
+      // nuvens finas e compridas cruzando o sol
+      const streaks = [0, 1, 2].map((i) => {
+        const w = W * (0.35 + i * 0.12), h = Math.max(8, H * 0.016), L = makeLayer(w, h + 4, res), pen = new Pencil(L.c, 7160 + i, 7170 + i, k);
+        const top = [], bot = [];
+        for (let x = 0; x <= w; x += 4) { const f = x / w, e = Math.sin(f * Math.PI); top.push([x, 2 + h / 2 - (h / 2) * e]); bot.push([x, 2 + h / 2 + (h / 2) * e * 0.6]); }
+        const p = new Path2D();
+        [...top, ...bot.slice().reverse()].forEach((q, j) => (j ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+        L.c.fillStyle = PAL.paper;
+        L.c.fill(p);
+        pen.path(top, { w: 0.7, col: PAL.g2, a: 0.8, passes: 1 });
+        pen.path(bot, { w: 0.9, col: PAL.g1, a: 0.9, passes: 1 });
+        return { L, w, h: h + 4, y: hY - H * (0.27 - i * 0.045), x0: W * (0.2 + i * 0.3), v: (4 + i * 2) * k };
+      });
+      const pat = hatchPattern(env.ctx, PAL.g2, PAL.g1, 2.4, 0.5, 0.7);
+      const grass = makeGrass(7190, W, bankY, k, { h: 16, tallP: 0.5, step: 2.6, depth: 14 });
+      const eSc = (H * (portrait ? 0.055 : 0.075)) / 34;
+      const herd = [
+        { o: 0, s: 1 }, { o: 85, s: 0.92 }, { o: 130, s: 0.5 }, { o: 215, s: 1.05 },
+      ];
+
+      const st = { W, H, land: [], fg: [], wind: 0.9 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res);
+        const pen = new Pencil(land.c, 7200, seedJ, k), S = pen.S;
+        drawRange(pen, {
+          pts: kiliPts, base: hY + 2, fill: '#ECE5D7', hatchCol: PAL.g2, hatchA: 0.5, fallA: 0.45,
+          fallEvery: 2, fallDensity: 0.55, hatchEvery: 1, hatchFrom: 0.42, crossFrom: 0.85, strata: 3, maxFall: H * 0.06,
+          lineW: 0.9, lineCol: PAL.g2, lineA: 0.9, snowY: hY - H * hf * 0.17,
+          shade: (x, y, sl) => 0.3 + 0.5 * Math.tanh(sl * 4) + 0.15 * nK(x * 0.03),
+        });
+        // árvores minúsculas na linha do horizonte
+        const tiny = [];
+        for (let i = 0; i < 22; i++) {
+          const x = S() * W, w = (4 + S() * 6) * k, h = (3 + S() * 4) * k;
+          tiny.push([x, hY + 1, x, hY - h], [x - w, hY - h, x + w, hY - h - S() * 1.5]);
+        }
+        pen.lines(tiny, { w: 0.9, col: PAL.g1, a: 0.8 });
+        pen.path(sample(-4, W + 4, 6, () => hY + 1), { w: 0.8, col: PAL.g1, a: 0.8, gap: 0.1, jit: 0.4 });
+        // calota de neve no topo achatado do Kilimanjaro
+        const capTop = Math.min(...kiliPts.map((q) => q[1]));
+        const cap = kiliPts.filter((q) => q[1] < capTop + H * 0.03).map((q) => [q[0], q[1] + H * 0.012 + Math.abs(Math.sin(q[0] * 0.09)) * H * 0.012]);
+        pen.path(cap, { w: 0.8, col: PAL.g2, a: 0.9, passes: 1, gap: 0.06 });
+        const capH = [];
+        for (const [x, y] of cap) if (S() < 0.5) capH.push([x, y + 1, x - 2 * k, y + H * 0.02 * S()]);
+        pen.lines(capH, { w: 0.6, col: PAL.g2, a: 0.5 });
+        acacia(pen, W * (portrait ? 0.2 : 0.17), H * 0.7, H * 0.13, Math.max(W * 0.12, 60 * k));
+        acacia(pen, W * 0.52, hY + H * 0.03, H * 0.07, Math.max(W * 0.06, 34 * k));
+        const gs = (H * 0.12) / 52;
+        giraffe(pen, W * (portrait ? 0.32 : 0.25), H * 0.705, gs, -1);
+        giraffe(pen, W * (portrait ? 0.4 : 0.29), H * 0.715, gs * 0.88, 1);
+        st.land.push(land);
+
+        const fg = makeLayer(W, H, res);
+        const pf = new Pencil(fg.c, 7300, seedJ + 5, k);
+        drawBank(pf, W, H, bankY, trailY, { rocks: 3, grass: false, tone: 1.1 });
+        acacia(pf, W * (portrait ? 0.92 : 0.86), bankY(W * 0.86) + 10 * k, H * (portrait ? 0.5 : 0.6), portrait ? W * 0.55 : W * 0.36);
+        st.fg.push(fg);
+      });
+
+      st.ground = trailY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        for (const s of streaks) {
+          const span = W + s.w;
+          ctx.drawImage(s.L.cv, wrap(s.x0 + t * s.v, span) - s.w, s.y, s.w, s.h);
+        }
+        // abutres planando em círculos
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = t * (0.25 + i * 0.05) + i * 2.1, r = (40 + i * 18) * k;
+          const x = W * 0.3 + Math.cos(a) * r * 1.6, y = H * 0.17 + Math.sin(a) * r * 0.5, s = (7 + i) * k;
+          ctx.moveTo(x - s, y - s * 0.2);
+          ctx.quadraticCurveTo(x - s * 0.4, y - s * 0.05, x, y);
+          ctx.quadraticCurveTo(x + s * 0.4, y - s * 0.05, x + s, y - s * 0.2);
+        }
+        ctx.strokeStyle = PAL.ink;
+        ctx.lineWidth = 1.3 * k;
+        ctx.stroke();
+
+        ctx.drawImage(land.cv, 0, 0, W, H);
+
+        // manada de elefantes atravessando a planície
+        const span = W + 420 * k;
+        for (const e of herd) {
+          const d = t * 9 * k + e.o * k;
+          const x = W + 140 * k - wrap(d + W * 0.25, span);
+          drawElephant(ctx, x, herdY + (1 - e.s) * 4 * k, eSc * e.s, d * 0.16, pat, k);
+        }
+
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+        drawGrass(ctx, grass, t, k, 0.9, PAL.g1);
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna];
 
   /*<T>*/
   /* ================================================================
