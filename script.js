@@ -724,7 +724,7 @@
    *        addVariant()           desenha mais uma variante de "boil"; false quando acabou
    *        count                  variantes prontas
    *        wind                   (opcional) força do vento no cachecol do viajante
-   *    env = { W, H, res, k }: tamanho em px CSS, densidade de pixels, escala do traço
+   *    env = { W, H, res, k, ctx }: tamanho em px CSS, densidade de pixels, escala do traço, contexto principal
    * ================================================================ */
 
   /* ---------- Cena I · Fiordes (Geirangerfjord, Noruega) ---------- */
@@ -1200,8 +1200,268 @@
     },
   };
 
+  /* ---------- Cena III · Saara (Erg Chebbi, Marrocos) ---------- */
+
+  /**
+   * Campo de dunas: barlavento suave à esquerda, crista afiada e face de
+   * deslizamento íngreme à direita (o vento sopra da esquerda).
+   */
+  function duneField(list, base) {
+    return (x) => {
+      let h = 0;
+      for (const d of list) {
+        const dx = x - d.c;
+        let v = 0;
+        if (dx < 0) { const t = 1 + dx / d.wl; if (t > 0) v = Math.pow(smooth(0, 1, t), 1.15); }
+        else { const t = dx / d.wr; if (t < 1) v = Math.pow(1 - t, 1.3); }
+        if (v * d.h > h) h = v * d.h;
+      }
+      return base - h;
+    };
+  }
+  function randomDunes(seed, n, W, H, hMin, hMax, wl, wr) {
+    const r = rng(seed), Wd = Math.max(W, H * 0.8); // no retrato as dunas não afinam
+    return Array.from({ length: n }, (_, i) => ({
+      c: W * ((i + 0.2 + r() * 0.6) / Math.max(1, n - 1)) - W * 0.08,
+      h: H * (hMin + r() * (hMax - hMin)),
+      wl: Wd * wl * (0.7 + r() * 0.6),
+      wr: Wd * wr * (0.7 + r() * 0.6),
+    }));
+  }
+  /** Cristas (pontos mais altos) de um campo de dunas, para soltar areia ao vento. */
+  const crestsOf = (list, f) => list.map((d) => [d.c, f(d.c)]);
+
+  /** Dromedário de perfil, pernas em passo; rider = com cavaleiro. */
+  function drawCamel(ctx, x, y, sc, ph, rider, pat) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (const [lx, o] of [[-6, 0], [-3.5, Math.PI], [6, Math.PI], [8.5, 0]]) {
+      const sw = Math.sin(ph + o) * 3;
+      ctx.moveTo(lx, -14);
+      ctx.lineTo(lx + sw * 0.4, -7);
+      ctx.lineTo(lx + sw, 0);
+    }
+    ctx.strokeStyle = PAL.ink;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    const body = [[-9.5, -18], [-8, -21], [-4, -29], [1, -29.5], [4.5, -22], [8, -20], [11, -21], [13, -27], [15.5, -29.5],
+      [19.5, -28.6], [20, -26.8], [16, -26], [13.6, -18.6], [11, -14], [2, -12.6], [-7, -13.4]];
+    ctx.beginPath();
+    body.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+    ctx.closePath();
+    ctx.fillStyle = pat;
+    ctx.fill();
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-9.5, -18);
+    ctx.quadraticCurveTo(-11.5, -15, -10.6, -11);
+    ctx.stroke();
+    if (rider) {
+      ctx.beginPath();
+      ctx.moveTo(-3.5, -29);
+      ctx.lineTo(-1.2, -38);
+      ctx.lineTo(1.6, -29);
+      ctx.closePath();
+      ctx.fillStyle = PAL.g1;
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-0.8, -39.6, 1.9, 0, TAU);
+      ctx.fillStyle = PAL.ink;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  const Sahara = {
+    id: 'saara',
+    numeral: 'III',
+    place: 'Erg Chebbi, Saara',
+    meta: 'Marrocos · 31°08′N 4°01′W',
+    mood: 'vasta, quente, silenciosa',
+    duration: 28,
+    stopAt: 0.45,
+    stopAtPortrait: 0.45,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hY = H * (portrait ? 0.56 : 0.58);          // horizonte
+      const farL = randomDunes(2101, portrait ? 6 : 9, W, H, 0.02, 0.06, 0.13, 0.05);
+      const midL = randomDunes(2102, portrait ? 3 : 4, W, H, 0.07, 0.14, 0.26, 0.1);
+      const nearL = [
+        { c: W * 0.45, h: H * 0.14, wl: W * 0.75, wr: W * 0.36 },
+        { c: W * 1.15, h: H * 0.12, wl: W * 0.45, wr: W * 0.3 },
+      ];
+      const far = duneField(farL, hY + 1);
+      const mid = duneField(midL, H * 0.74);
+      const near = duneField(nearL, H * 0.92);
+      const farPts = sample(-6, W + 6, 3, far), midPts = sample(-6, W + 6, 3, mid), nearPts = sample(-6, W + 6, 3, near);
+      const shadeDune = (base, n) => (x, y, sl) => base + 0.95 * smooth(0.04, 0.35, sl) + 0.1 * n(x * 0.02);
+      const nD = noise1(rng(2103));
+      const crests = [...crestsOf(midL, mid).filter((c) => c[1] < H * 0.74 - 4), ...crestsOf(nearL, near)].filter((c) => c[0] > -20 && c[0] < W + 20);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 2150, 2151, k), S = pen.S;
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.01, H * 0.22, 0.3);
+        sunDisc(pen, W * (portrait ? 0.62 : 0.68), H * (portrait ? 0.3 : 0.28), Math.min(W, H) * 0.085, 3);
+        // chão plano até o horizonte: traços finos e horizontais
+        const L = [];
+        for (let y = hY + 2; y < H; y += 5 * k) {
+          let x = -10;
+          while (x < W) { const len = 20 + S() * 90; if (S() < 0.35) L.push([x, y, x + len, y + (S() - 0.5)]); x += len + S() * 60; }
+        }
+        pen.lines(L, { w: 0.5, col: PAL.g3, a: 0.45 });
+      }
+
+      const pat = hatchPattern(env.ctx, PAL.g2, PAL.ink, 2.2, 0.6, 0.6);
+      const sand = makeParticles(2190, portrait ? 90 : 160);
+      const camels = [0, 1, 2, 3, 4];
+      const camelSc = clamp(H / 900, 0.6, 1.3) * (portrait ? 0.85 : 1);
+
+      const st = { W, H, far: [], mid: [], fg: [], wind: 1.5 };
+      withVariants(st, (seedJ) => {
+        const fl = makeLayer(W, H, res);
+        const pen = new Pencil(fl.c, 2200, seedJ, k);
+        drawRange(pen, {
+          pts: farPts, base: hY + 2, fill: '#EEE7DA', hatchCol: PAL.g2, hatchA: 0.45, fallA: 0.3,
+          fallEvery: 3, fallDensity: 0.25, hatchEvery: 1, hatchFrom: 0.45, crossFrom: 0.95, strata: 6,
+          lineW: 0.8, lineCol: PAL.g2, lineA: 0.9, shade: shadeDune(0.05, nD),
+        });
+        st.far.push(fl);
+
+        const ml = makeLayer(W, H, res);
+        const pm = new Pencil(ml.c, 2300, seedJ + 1, k);
+        drawRange(pm, {
+          pts: midPts, base: H * 0.75, fill: '#EFE8DB', hatchCol: PAL.g1, hatchA: 0.6, fallA: 0.35,
+          fallEvery: 2, fallDensity: 0.45, hatchEvery: 1, hatchFrom: 0.3, crossFrom: 0.62, strata: 9,
+          bandH: H * 0.025, bandStep: 3, bandA: 0.25,
+          lineW: 1, lineCol: PAL.g1, lineA: 0.95, shade: shadeDune(0.04, nD), maxFall: H * 0.05,
+        });
+        st.mid.push(ml);
+
+        // duna próxima: onde o viajante caminha
+        const fg = makeLayer(W, H, res), c = fg.c;
+        const pf = new Pencil(c, 2400, seedJ + 2, k), S = pf.S;
+        const poly = new Path2D();
+        poly.moveTo(-6, H + 6);
+        nearPts.forEach((p) => poly.lineTo(p[0], p[1]));
+        poly.lineTo(W + 6, H + 6);
+        poly.closePath();
+        c.fillStyle = '#F0E9DC';
+        c.fill(poly);
+        c.save();
+        c.clip(poly);
+        const hatch = [], cross = [], marks = [];
+        for (let i = 1; i < nearPts.length - 1; i++) {
+          const [x, y] = nearPts[i];
+          const sl = (nearPts[i + 1][1] - nearPts[i - 1][1]) / 6;
+          const s = smooth(0.04, 0.3, sl);
+          if (s > 0.2) {
+            const L = (H - y) * (0.4 + S() * 0.6) * s;
+            hatch.push([x, y + 1, x - L * 0.35, y + 1 + L]);
+            if (s > 0.6 && S() < 0.6) cross.push([x - L * 0.2, y + L * 0.1, x + L * 0.15, y + L * 0.7]);
+          }
+        }
+        // marcas de vento na areia (ondinhas paralelas)
+        for (let i = 0; i < (portrait ? 140 : 260); i++) {
+          const x = S() * W, top = near(x), y = top + 6 * k + S() * (H - top) * 0.9;
+          const sl = (near(x + 3) - near(x - 3)) / 6;
+          if (sl > 0.08) continue;
+          const len = (18 + S() * 40) * k, tilt = sl * 0.8;
+          const seg = [];
+          for (let j = 0; j <= 8; j++) { const f = j / 8; seg.push([x + f * len, y + f * len * tilt + Math.sin(f * Math.PI) * -1.5 * k]); }
+          marks.push(seg);
+        }
+        // volume do barlavento: tom suave que escurece em direção ao vale
+        const body = [];
+        for (let i = 0; i < nearPts.length; i += 2) {
+          const [x, y] = nearPts[i];
+          const sl = (near(x + 3) - near(x - 3)) / 6;
+          if (sl > 0.08) continue;
+          const d = H - y;
+          for (let j = 0; j < 2; j++) {
+            if (S() < 0.5) continue;
+            const y0 = y + d * (0.35 + S() * 0.5), L = d * (0.1 + S() * 0.25);
+            body.push([x, y0, x + L * 0.9, y0 + L * 0.35]);
+          }
+        }
+        pf.lines(body, { w: 0.6, col: PAL.g2, a: 0.35 });
+        pf.lines(hatch, { w: 0.7, col: PAL.ink, a: 0.45 });
+        pf.lines(cross, { w: 0.6, col: PAL.ink, a: 0.3 });
+        for (const m of marks) pf.path(m, { w: 0.7, col: PAL.g1, a: 0.55, passes: 1, gap: 0, jit: 0.3 });
+        c.restore();
+        pf.path(nearPts, { w: 1.3, col: PAL.ink, a: 0.95, gap: 0.02, jit: 0.5 });
+        st.fg.push(fg);
+      });
+
+      st.ground = (x) => near(x) + 2 * k;
+
+      st.draw = (ctx, t, v) => {
+        const fl = st.far[v] || st.far[0], ml = st.mid[v] || st.mid[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+
+        // miragem: o horizonte tremula com o calor e se espelha como água
+        const lr = fl.res, band = H * 0.11;
+        for (let y = hY - band; y < hY + 2; y += 3) {
+          const q = 1 - (hY - y) / band;
+          const off = (Math.sin(y * 0.22 + t * 3.1) + 0.5 * Math.sin(y * 0.61 - t * 4.3)) * 1.6 * k * q;
+          ctx.drawImage(fl.cv, 0, y * lr, fl.cv.width, 3 * lr, off, y, W, 3.2);
+        }
+        ctx.drawImage(fl.cv, 0, 0, fl.cv.width, (hY - band) * lr, 0, 0, W, hY - band);
+        ctx.globalAlpha = 0.28;
+        const mir = H * 0.035;
+        for (let y = 0; y < mir; y += 2) {
+          const off = Math.sin(y * 0.5 + t * 3.6) * 2.2 * k;
+          ctx.drawImage(fl.cv, 0, (hY - (y + 2) / 0.6) * lr, fl.cv.width, (2 / 0.6) * lr, off, hY + y, W, 2.2);
+        }
+        ctx.globalAlpha = 1;
+
+        ctx.drawImage(ml.cv, 0, 0, W, H);
+
+        // caravana atravessando a crista do meio
+        const span = W + 320;
+        camels.forEach((i) => {
+          const x = wrap(t * 7 * k + W * 0.35 - i * 30 * camelSc, span) - 160;
+          drawCamel(ctx, x, mid(x) + 1, camelSc * 0.9, t * 4.2 + i * 1.3, i % 2 === 0, pat);
+        });
+
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+
+        // areia soprada das cristas
+        if (crests.length) {
+          for (let b = 0; b < 3; b++) {
+            ctx.beginPath();
+            sand.forEach((p, i) => {
+              if (i % 3 !== b) return;
+              const cr = crests[i % crests.length], L = 70 * k * p.s + 30 * k;
+              const a = wrap(t * 22 * k * p.v + p.ph * L, L) / L;
+              const x = cr[0] + a * L * 1.4, y = cr[1] - 2 + a * L * 0.18 + Math.sin(t * 3 + p.ph) * 2 * k;
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + 2.5 * k, y + 0.3);
+            });
+            ctx.strokeStyle = PAL.g1;
+            ctx.globalAlpha = [0.55, 0.38, 0.22][b];
+            ctx.lineWidth = 0.8 * k;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji];
+  const SCENES = [Fjord, Fuji, Sahara];
 
   /*<T>*/
   /* ================================================================
@@ -1399,7 +1659,7 @@
   const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 600 }) : setTimeout(fn, 60));
 
   function build() {
-    const st = SCENES[idx].build({ W, H, res: DPR, k: K });
+    const st = SCENES[idx].build({ W, H, res: DPR, k: K, ctx });
     state = st;
     const more = () => { if (state === st && st.addVariant()) idle(more); };
     if (!reduced) idle(more);
