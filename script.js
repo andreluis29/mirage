@@ -1728,8 +1728,327 @@
     },
   };
 
+  /* ---------- Cena V · Amazônia (Rio Negro, Brasil) ---------- */
+
+  /** Linha de copas: envoltória de meios-círculos (árvores lado a lado). */
+  function canopyLine(seed, x0, x1, baseFn, liftFn, rMin, rMax) {
+    const r = rng(seed), crowns = [];
+    let x = x0;
+    while (x < x1) {
+      const rr = rMin + r() * (rMax - rMin);
+      crowns.push([x, rr, r()]);
+      x += rr * (0.8 + r() * 0.6);
+    }
+    return (xq) => {
+      let y = Infinity;
+      const b = baseFn(xq);
+      for (const [cx, rr, j] of crowns) {
+        const d = xq - cx;
+        if (Math.abs(d) < rr) {
+          const yy = baseFn(cx) - liftFn(cx) - Math.sqrt(rr * rr - d * d) * 0.75 - j * rr * 0.3;
+          if (yy < y) y = yy;
+        }
+      }
+      return y === Infinity ? b : Math.min(y, b);
+    };
+  }
+
+  /** Textura de folhagem: pequenos "c" e laços dentro de uma área recortada. */
+  function foliage(pen, poly, x0, x1, yTop, yBot, n, col = PAL.g1, a = 0.45) {
+    const c = pen.c, S = pen.S;
+    c.save();
+    c.clip(poly);
+    c.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = x0 + S() * (x1 - x0), y = yTop + S() * (yBot - yTop), r = (1.5 + S() * 3) * pen.k, a0 = S() * TAU;
+      c.moveTo(x + Math.cos(a0) * r, y + Math.sin(a0) * r);
+      c.arc(x, y, r, a0, a0 + Math.PI * (1 + S()));
+    }
+    c.strokeStyle = col;
+    c.lineWidth = 0.6 * pen.k;
+    c.globalAlpha = a;
+    c.stroke();
+    c.globalAlpha = 1;
+    c.restore();
+  }
+
+  /** Palmeira de açaí: tronco fino e curvo, coroa de folhas pendentes. */
+  function palm(pen, x, baseY, h, lean) {
+    const S = pen.S, k = pen.k, tx = x + lean * h, ty = baseY - h;
+    const trunk = [];
+    for (let i = 0; i <= 12; i++) { const f = i / 12; trunk.push([x + lean * h * f * f, baseY - h * f]); }
+    pen.path(trunk, { w: 1.6, col: PAL.ink, passes: 2, jit: 0.3 });
+    const leaflets = [];
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI / 2 + (i - 4) * 0.42 + (S() - 0.5) * 0.2, L = h * (0.32 + S() * 0.12);
+      const pts = [];
+      for (let j = 0; j <= 10; j++) {
+        const f = j / 10;
+        const px = tx + Math.cos(a) * L * f, py = ty + Math.sin(a) * L * f + f * f * L * 0.7;
+        pts.push([px, py]);
+        if (j > 1) leaflets.push([px, py, px + (S() - 0.5) * 3 * k, py + (5 + S() * 6) * k]);
+      }
+      pen.path(pts, { w: 1, col: PAL.ink, passes: 1, jit: 0.2 });
+    }
+    pen.lines(leaflets, { w: 0.6, col: PAL.ink, a: 0.75 });
+  }
+
+  /** Folha grande (bananeira) com nervura central, nervuras paralelas e rasgos. */
+  function bigLeaf(pen, x0, y0, ang, len, wid) {
+    const c = pen.c, S = pen.S, mid = [], up = [], dn = [];
+    for (let i = 0; i <= 20; i++) {
+      const f = i / 20, bend = Math.sin(f * Math.PI) * len * 0.08;
+      const mx = x0 + Math.cos(ang) * len * f - Math.sin(ang) * bend;
+      const my = y0 + Math.sin(ang) * len * f + Math.cos(ang) * bend;
+      const w = wid * Math.sin(Math.min(1, f * 1.15) * Math.PI) * (f < 0.95 ? 1 : 0.4);
+      mid.push([mx, my]);
+      up.push([mx - Math.sin(ang) * w, my + Math.cos(ang) * w]);
+      dn.push([mx + Math.sin(ang) * w, my - Math.cos(ang) * w]);
+    }
+    const pts = [...up, ...dn.slice().reverse()];
+    const p = new Path2D();
+    pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+    p.closePath();
+    c.fillStyle = PAL.paper2;
+    c.fill(p);
+    c.save();
+    c.clip(p);
+    const veins = [], shade = [];
+    for (let i = 1; i < 20; i++) {
+      const [mx, my] = mid[i];
+      veins.push([mx, my, up[Math.min(20, i + 1)][0], up[Math.min(20, i + 1)][1]]);
+      veins.push([mx, my, dn[Math.min(20, i + 1)][0], dn[Math.min(20, i + 1)][1]]);
+      for (let j = 0; j < 4; j++) { const f = S(); shade.push([mx + (dn[i][0] - mx) * f, my + (dn[i][1] - my) * f, mx + (dn[i][0] - mx) * f + 3, my + (dn[i][1] - my) * f + 6]); }
+    }
+    pen.lines(shade, { w: 0.6, col: PAL.g1, a: 0.45 });
+    pen.lines(veins, { w: 0.6, col: PAL.g1, a: 0.6 });
+    c.restore();
+    pen.path(mid, { w: 1.4, col: PAL.ink, passes: 1 });
+    pen.path([...pts, pts[0]], { w: 1.1, col: PAL.ink, passes: 2, jit: 0.4 });
+    const tears = [];
+    for (let i = 4; i < 19; i += 3) if (S() < 0.6) tears.push([up[i][0], up[i][1], (up[i][0] + mid[i][0]) / 2, (up[i][1] + mid[i][1]) / 2]);
+    pen.lines(tears, { w: 0.9, col: PAL.ink, a: 0.8 });
+  }
+
+  const Amazon = {
+    id: 'amazonia',
+    numeral: 'V',
+    place: 'Rio Negro, Amazônia',
+    meta: 'Brasil · 3°04′S 60°15′W',
+    mood: 'úmida, viva',
+    duration: 28,
+    stopAt: 0.55,
+    stopAtPortrait: 0.5,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const wY = H * (portrait ? 0.56 : 0.58), depth = H - wY;
+      const deckY = H * (portrait ? 0.83 : 0.84), deckT = H * 0.02;
+      const nA = noise1(rng(5101));
+      const flat = () => wY + 1;
+      const far = canopyLine(5102, -20, W + 20, flat, () => H * 0.012, 5 * k, 12 * k);
+      const left = canopyLine(5103, -30, W * 0.42, flat, (x) => H * (0.04 + 0.2 * Math.pow(1 - smooth(0, W * 0.42, x), 1.2)), 14 * k, 30 * k);
+      const right = canopyLine(5104, W * 0.6, W + 30, flat, (x) => H * (0.035 + 0.16 * Math.pow(smooth(W * 0.6, W, x), 1.2)), 14 * k, 30 * k);
+      const farPts = sample(-6, W + 6, 2, far), lPts = sample(-6, W * 0.44, 2, left), rPts = sample(W * 0.58, W + 6, 2, right);
+      const emX = W * (portrait ? 0.14 : 0.18);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 5150, 5151, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.005, H * 0.45, 0.9);
+        skyStrokes(pen, W, H * 0.005, H * 0.18, 0.7);
+        waterStrokes(pen, W, wY, H, 1.2);
+      }
+      const clouds = makeClouds(5160, 3, W, H, k, res, { y0: 0.04, dy: 0.06, speed: 3, size: Math.min(W * 0.34, H * 0.55) });
+      const mist = { L: mistSprite(5170, Math.ceil(W * 1.5), Math.ceil(H * 0.1), 80), y: wY - H * 0.08, v: 5 * k, a: 0.85 };
+      const ripples = makeRipples(5180, 200, W, wY, depth, k);
+      const rain = makeParticles(5190, portrait ? 140 : 240);
+      const rings = makeParticles(5191, 45);
+
+      const st = { W, H, land: [], fg: [], wind: 0.6 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res), c = land.c;
+        const pen = new Pencil(c, 5200, seedJ, k);
+        const forest = (pts, o) => {
+          drawRange(pen, Object.assign({
+            pts, base: wY + 1, fill: '#E5DCCB', hatchCol: PAL.g1, hatchA: 0.6, fallA: 0.4,
+            fallEvery: 2, fallDensity: 0.6, hatchEvery: 1, hatchFrom: 0.35, crossFrom: 0.65, maxFall: H * 0.06,
+            bandH: H * 0.03, bandA: 0.45, lineW: 1, lineCol: PAL.g1, lineA: 0.95,
+            shade: (x, y, sl) => 0.4 + 0.45 * Math.tanh(sl * 1.6) + 0.2 * nA(x * 0.05),
+          }, o));
+          const poly = new Path2D();
+          poly.moveTo(pts[0][0], wY + 1);
+          pts.forEach((p) => poly.lineTo(p[0], p[1]));
+          poly.lineTo(pts[pts.length - 1][0], wY + 1);
+          poly.closePath();
+          const top = Math.min(...pts.map((p) => p[1]));
+          foliage(pen, poly, pts[0][0], pts[pts.length - 1][0], top, wY, Math.round(((pts[pts.length - 1][0] - pts[0][0]) * (wY - top)) / (70 * k * k)), PAL.ink, 0.4);
+        };
+        forest(farPts, { fill: '#ECE5D7', hatchCol: PAL.g2, hatchA: 0.4, bandH: 0, lineCol: PAL.g2, lineW: 0.8 });
+
+        // sumaúma emergente acima da mata da esquerda
+        const crownY = wY - H * 0.36, cw = Math.max(W * 0.12, 70 * k), baseTop = left(emX);
+        pen.lines([[emX - 2 * k, baseTop + 5, emX - 3 * k, crownY + 6], [emX + 3 * k, baseTop + 5, emX + 2 * k, crownY + 6],
+          [emX, crownY + H * 0.05, emX - cw * 0.3, crownY + 4], [emX, crownY + H * 0.05, emX + cw * 0.35, crownY + 4]], { w: 1.3, col: PAL.ink });
+        const crown = [];
+        for (let i = 0; i <= 30; i++) {
+          const f = i / 30, x = emX - cw / 2 + f * cw;
+          crown.push([x, crownY - Math.sin(f * Math.PI) * H * 0.035 - Math.abs(Math.sin(f * 9)) * 4 * k]);
+        }
+        for (let i = 30; i >= 0; i--) { const f = i / 30; crown.push([emX - cw / 2 + f * cw, crownY + 6 * k + Math.sin(f * 7) * 2 * k]); }
+        const cp = new Path2D();
+        crown.forEach((q, i) => (i ? cp.lineTo(q[0], q[1]) : cp.moveTo(q[0], q[1])));
+        cp.closePath();
+        c.fillStyle = '#E7DFCF';
+        c.fill(cp);
+        foliage(pen, cp, emX - cw / 2, emX + cw / 2, crownY - H * 0.04, crownY + 8 * k, 120);
+        c.save();
+        c.clip(cp);
+        const us = [];
+        for (let x = emX - cw / 2; x < emX + cw / 2; x += 2) us.push([x, crownY + 7 * k, x + 4, crownY - 2 * k]);
+        pen.lines(us, { w: 0.6, col: PAL.ink, a: 0.5 });
+        c.restore();
+        pen.path(crown, { w: 1, col: PAL.ink, passes: 1, jit: 0.4 });
+
+        forest(lPts, {});
+        forest(rPts, {});
+        for (const [i, px] of [W * 0.74, W * 0.8, W * 0.9].entries()) {
+          palm(pen, px, right(px) + 4 * k, H * (0.11 + i * 0.02), (i - 1) * 0.08);
+        }
+        pen.path(sample(-4, W + 4, 6, () => wY), { w: 0.9, col: PAL.g1, a: 0.8, gap: 0.1, jit: 0.5 });
+        st.land.push(land);
+
+        // trapiche (passarela de madeira) e folhas grandes
+        const fg = makeLayer(W, H, res), fc = fg.c;
+        const pf = new Pencil(fc, 5300, seedJ + 5, k), S = pf.S;
+        const postGap = Math.max(W / 8, 90 * k), railH = H * 0.055;
+        const posts = [], rails = [], refl = [];
+        for (let x = postGap * 0.3; x < W + postGap; x += postGap) {
+          posts.push([x, deckY + deckT, x + (S() - 0.5) * 2, H + 4]);
+          posts.push([x + 4 * k, deckY + deckT, x + 4 * k + (S() - 0.5) * 2, H + 4]);
+          rails.push([x, deckY, x + (S() - 0.5), deckY - railH]);
+          for (let y = deckY + deckT + 4; y < H; y += 4) refl.push([x - 1 + Math.sin(y * 0.3) * 2, y, x + 3 + Math.sin(y * 0.3) * 2, y + 2]);
+        }
+        pf.lines(refl, { w: 0.5, col: PAL.g2, a: 0.4 });
+        pf.lines(posts, { w: 2.2, col: PAL.ink, a: 0.9 });
+        fc.fillStyle = PAL.g3;
+        fc.fillRect(-4, deckY, W + 8, deckT);
+        const planks = [];
+        for (let x = 0; x < W; x += (9 + S() * 5) * k) planks.push([x, deckY + 1, x + (S() - 0.5), deckY + deckT - 1]);
+        pf.lines(planks, { w: 0.6, col: PAL.ink, a: 0.6 });
+        pf.path(sample(-4, W + 4, 6, () => deckY), { w: 1.3, col: PAL.ink, passes: 2 });
+        pf.path(sample(-4, W + 4, 6, () => deckY + deckT), { w: 1.1, col: PAL.ink, passes: 1 });
+        pf.lines(rails, { w: 1.6, col: PAL.ink, a: 0.9 });
+        pf.path(sample(-4, W + 4, 6, (x) => deckY - railH + Math.sin(x * 0.02) * 1.5), { w: 1.2, col: PAL.ink, passes: 2 });
+        pf.path(sample(-4, W + 4, 6, (x) => deckY - railH * 0.5 + Math.sin(x * 0.03) * 1), { w: 0.8, col: PAL.g1, passes: 1, gap: 0.05 });
+        const L = Math.min(W, H) * (portrait ? 0.45 : 0.32);
+        bigLeaf(pf, W * 1.02, H * 1.02, -Math.PI * 0.78, L, L * 0.22);
+        bigLeaf(pf, W * 1.04, H * 0.86, -Math.PI * 0.9, L * 0.8, L * 0.18);
+        bigLeaf(pf, -W * 0.02, H * 1.04, -Math.PI * 0.2, L * 0.75, L * 0.18);
+        st.fg.push(fg);
+      });
+
+      st.ground = () => deckY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        drawClouds(ctx, clouds, t, W);
+        ctx.drawImage(land.cv, 0, 0, W, H);
+        reflect(ctx, land, wY, depth, t, k, { alpha: 0.38, amp: 1.1 });
+        drawRipples(ctx, ripples, t, W, k, { speed: 0.6 });
+
+        // anéis de chuva no rio
+        ctx.beginPath();
+        for (const p of rings) {
+          const cyc = t / 1.3 + p.ph, n = Math.floor(cyc), f = cyc - n;
+          const x = wrap(p.x + n * 0.618, 1) * W, y = wY + 6 + wrap(p.y + n * 0.381, 1) * (depth - 10);
+          const d = (y - wY) / depth, r = f * 7 * k * (0.5 + d);
+          ctx.moveTo(x + r, y);
+          ctx.ellipse(x, y, r, r * 0.3, 0, 0, TAU);
+        }
+        ctx.strokeStyle = PAL.g1;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 0.7 * k;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // canoa com remador
+        const span = W * 1.4, cx = wrap(t * 11 * k + W * 0.2, span) - W * 0.2, cy = wY + depth * 0.33 + Math.sin(t * 1.4) * k;
+        const cs = 1.2 * k, stroke = Math.sin(t * 2.4);
+        for (const flip of [true, false]) {
+          ctx.save();
+          ctx.translate(cx, cy + (flip ? 2 * k : 0));
+          ctx.scale(cs, flip ? -cs * 0.5 : cs);
+          ctx.globalAlpha = flip ? 0.22 : 1;
+          ctx.beginPath();
+          ctx.moveTo(-26, -5);
+          ctx.quadraticCurveTo(-20, 2, 0, 2);
+          ctx.quadraticCurveTo(20, 2, 26, -5);
+          ctx.quadraticCurveTo(0, -1, -26, -5);
+          ctx.fillStyle = PAL.g1;
+          ctx.fill();
+          ctx.strokeStyle = PAL.ink;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(2, -2);
+          ctx.lineTo(0, -12);
+          ctx.moveTo(-1, -9);
+          ctx.lineTo(7 + stroke * 4, -6);
+          ctx.moveTo(4 + stroke * 6, -16);
+          ctx.lineTo(10 + stroke * 8, 6);
+          ctx.lineWidth = 1.3;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(0, -14.5, 2.4, 0, TAU);
+          ctx.fillStyle = PAL.ink;
+          ctx.fill();
+          ctx.restore();
+        }
+        drawMist(ctx, mist, t);
+
+        // araras: corpo, asas batendo e cauda longa
+        ctx.beginPath();
+        for (let i = 0; i < 2; i++) {
+          const x = wrap(t * 30 * k + i * 28 * k, W + 240) - 120, y = H * 0.2 + i * 10 * k + Math.sin(t * 0.7 + i) * 8 * k;
+          const s = 9 * k, f = Math.sin(t * 7 + i * 1.7) * s * 0.7;
+          ctx.moveTo(x - s * 1.6, y + s * 0.5);
+          ctx.lineTo(x + s * 0.6, y);
+          ctx.moveTo(x - s * 0.1, y);
+          ctx.quadraticCurveTo(x - s * 0.4, y - s * 0.4 - f * 0.4, x - s * 0.9, y - f);
+          ctx.moveTo(x - s * 0.1, y);
+          ctx.quadraticCurveTo(x + s * 0.2, y - s * 0.3 - f * 0.3, x + s * 0.1, y - f * 0.9);
+        }
+        ctx.strokeStyle = PAL.ink;
+        ctx.lineWidth = 1.3 * k;
+        ctx.stroke();
+
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+
+        // chuva fina inclinada
+        ctx.beginPath();
+        for (const p of rain) {
+          const v = (380 + p.v * 260) * k, L = (9 + p.s * 8) * k;
+          const y = wrap(p.y * (H + 40) + t * v, H + 40) - 20;
+          const x = wrap(p.x * (W + 80) - t * v * 0.22, W + 80) - 40;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - L * 0.22, y + L);
+        }
+        ctx.strokeStyle = PAL.g1;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 0.7 * k;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara, Patagonia];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon];
 
   /*<T>*/
   /* ================================================================
