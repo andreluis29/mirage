@@ -85,6 +85,8 @@ body {
 
 /* ---------- Título ---------- */
 .masthead {
+  /* halo de papel: o título continua legível quando uma nuvem passa atrás */
+  text-shadow: 0 0 3px var(--paper), 0 0 8px var(--paper), 0 0 14px var(--paper);
   position: absolute;
   top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
   left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
