@@ -1460,8 +1460,276 @@
     },
   };
 
+  /* ---------- Cena IV · Torres del Paine (Patagônia, Chile) ---------- */
+
+  /** Torre de granito: lados quase verticais, topo arredondado, estrias e sombra à direita. */
+  function graniteTower(pen, cx, baseY, topY, w, seed) {
+    const c = pen.c, S = pen.S, n = noise1(rng(seed)), h = baseY - topY;
+    const left = [], right = [];
+    for (let i = 0; i <= 24; i++) {
+      const f = i / 24, y = baseY - f * h;
+      const wf = (1 - f * 0.3) * (f > 0.82 ? Math.sqrt(Math.max(0, (1 - f) / 0.18)) : 1);
+      left.push([cx - (w / 2) * wf + n(f * 6) * w * 0.07, y]);
+      right.push([cx + (w / 2) * wf + n(f * 6 + 9) * w * 0.07, y]);
+    }
+    const pts = [...left, ...right.reverse()];
+    const p = new Path2D();
+    pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+    p.closePath();
+    c.fillStyle = '#E9E1D2';
+    c.fill(p);
+    c.save();
+    c.clip(p);
+    const st = [], cracks = [], dark = [];
+    for (let x = cx - w * 0.6; x < cx + w * 0.6; x += 2.4 * pen.k) {
+      const sh = clamp((x - cx) / w + 0.5, 0, 1);
+      let y = topY - 4;
+      while (y < baseY) {
+        const L = h * (0.05 + S() * 0.25);
+        if (S() < 0.2 + sh * 0.75) st.push([x + (S() - 0.5), y, x + (S() - 0.5) * 2, y + L]);
+        y += L + S() * h * 0.08;
+      }
+      if (sh > 0.45 && S() < 0.85) dark.push([x, topY, x - w * 0.12, baseY]);
+    }
+    for (let i = 0; i < 6; i++) { const y = topY + h * (0.2 + S() * 0.75), x = cx - w * 0.4 + S() * w * 0.5; cracks.push([x, y, x + w * (0.1 + S() * 0.25), y + (S() - 0.5) * 4]); }
+    pen.lines(st, { w: 0.65, col: PAL.g1, a: 0.6 });
+    pen.lines(dark, { w: 0.65, col: PAL.ink, a: 0.5 });
+    pen.lines(cracks, { w: 0.6, col: PAL.g1, a: 0.6 });
+    c.restore();
+    pen.path([...pts, pts[0]], { w: 1.2, col: PAL.ink, a: 0.95, gap: 0.03, jit: 0.4 });
+  }
+
+  /** Nuvem lenticular: lentes empilhadas, típicas do vento da Patagônia. */
+  function lensCloud(seed, w, h, k, res) {
+    const L = makeLayer(w, h, res), c = L.c, pen = new Pencil(c, seed, seed + 1, k), S = pen.S;
+    for (let i = 0; i < 3; i++) {
+      const cx = w / 2 + (S() - 0.5) * w * 0.15, cy = h * (0.3 + i * 0.2), rx = w * (0.48 - i * 0.09), ry = h * (0.11 + S() * 0.04);
+      const pts = [];
+      for (let a = 0; a <= TAU + 0.1; a += 0.1) pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry * (Math.sin(a) > 0 ? 0.7 : 1)]);
+      const p = new Path2D();
+      pts.forEach((q, j) => (j ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+      c.fillStyle = PAL.paper;
+      c.fill(p);
+      c.save();
+      c.clip(p);
+      const hs = [];
+      for (let x = cx - rx; x < cx + rx; x += 2.4) hs.push([x, cy + ry * 0.8, x + ry * 0.6, cy - ry * 0.1]);
+      pen.lines(hs, { w: 0.5, col: PAL.g2, a: 0.5 });
+      c.restore();
+      pen.path(pts, { w: 0.9, col: PAL.g1, a: 0.85, passes: 2 });
+    }
+    return L;
+  }
+
+  /** Arbusto (calafate): rabiscos em laço dentro de uma meia-lua. */
+  function bush(pen, x, y, r) {
+    const c = pen.c, S = pen.S, pts = [];
+    for (let i = 0; i <= 18; i++) {
+      const a = Math.PI + (i / 18) * Math.PI;
+      pts.push([x + Math.cos(a) * r * 1.3, y + Math.sin(a) * r * (0.8 + S() * 0.35)]);
+    }
+    const p = new Path2D();
+    pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+    p.closePath();
+    c.fillStyle = PAL.paper;
+    c.fill(p);
+    c.save();
+    c.clip(p);
+    c.beginPath();
+    for (let i = 0; i < r * 1.6; i++) {
+      const lx = x + (S() - 0.5) * r * 2.4, ly = y - S() * r, lr = (1.5 + S() * 2.5) * pen.k;
+      c.moveTo(lx + lr, ly);
+      c.arc(lx, ly, lr, 0, TAU);
+    }
+    c.strokeStyle = PAL.g1;
+    c.lineWidth = 0.6 * pen.k;
+    c.globalAlpha = 0.65;
+    c.stroke();
+    c.globalAlpha = 1;
+    const hs = [];
+    for (let xx = x; xx < x + r * 1.3; xx += 1.8) hs.push([xx, y, xx - r * 0.3, y - r]);
+    pen.lines(hs, { w: 0.6, col: PAL.ink, a: 0.4 });
+    c.restore();
+    pen.path(pts, { w: 0.9, col: PAL.ink, a: 0.9, passes: 1 });
+  }
+
+  /** Guanaco parado, de perfil. */
+  function guanaco(pen, x, y, s, dir = 1) {
+    const c = pen.c;
+    c.save();
+    c.translate(x, y);
+    c.scale(dir * s, s);
+    c.lineCap = 'round';
+    c.strokeStyle = PAL.ink;
+    c.lineWidth = 1.1;
+    c.beginPath();
+    for (const lx of [-4.6, -3.2, 3.4, 4.8]) { c.moveTo(lx, -11); c.lineTo(lx + (lx > 0 ? 0.5 : -0.5), 0); }
+    c.stroke();
+    c.beginPath();
+    c.ellipse(0, -12.5, 6.5, 3, 0, 0, TAU);
+    c.fillStyle = PAL.g2;
+    c.fill();
+    c.lineWidth = 0.8;
+    c.stroke();
+    c.beginPath();
+    c.moveTo(5, -13.5);
+    c.quadraticCurveTo(6.6, -18, 6.8, -23);
+    c.lineWidth = 2.2;
+    c.stroke();
+    c.beginPath();
+    c.ellipse(8.2, -23, 2.2, 1.2, 0.2, 0, TAU);
+    c.fillStyle = PAL.ink;
+    c.fill();
+    c.lineWidth = 0.9;
+    c.beginPath();
+    c.moveTo(6.6, -23.6);
+    c.lineTo(6.3, -25.6);
+    c.moveTo(-6.3, -13);
+    c.lineTo(-7.4, -11);
+    c.stroke();
+    c.restore();
+  }
+
+  const Patagonia = {
+    id: 'patagonia',
+    numeral: 'IV',
+    place: 'Torres del Paine',
+    meta: 'Chile · 50°57′S 72°59′W',
+    mood: 'selvagem, ventosa',
+    duration: 28,
+    stopAt: 0.38,
+    stopAtPortrait: 0.42,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hf = portrait ? 0.85 : 1;
+      const wY = H * (portrait ? 0.64 : 0.66), bottomWater = H * 0.86, depth = bottomWater - wY;
+      const nA = noise1(rng(4101)), nM = noise1(rng(4102)), nH = noise1(rng(4103)), nB = noise1(rng(4104));
+      const tw = portrait ? 1.6 : 1;                      // torres mais largas no retrato
+      const tBase = wY - H * 0.1 * hf;
+      const towers = [
+        { x: W * 0.465, top: tBase - H * 0.3 * hf, w: W * 0.05 * tw },
+        { x: W * 0.54, top: tBase - H * 0.24 * hf, w: W * 0.042 * tw },
+        { x: W * 0.615, top: tBase - H * 0.33 * hf, w: W * 0.055 * tw },
+      ];
+      const farR = (x) => {
+        const u = x / W;
+        return wY - H * hf * (0.17 + 0.07 * bell(u, 0.2, 0.1) + 0.08 * bell(u, 0.82, 0.1) + 0.03 * ridged(nA, u * 14));
+      };
+      const massif = (x) => {
+        const u = x / W;
+        const core = 0.09 * bell(u, 0.54, 0.14 * tw) + 0.035 * ridged(nM, u * 22);
+        return Math.min(wY + 1, wY - H * hf * (0.06 + core));
+      };
+      const hills = (x) => {
+        const u = x / W;
+        return wY - H * (0.02 + 0.035 * bell(u, 0.15, 0.15) + 0.03 * bell(u, 0.85, 0.12) + 0.01 * fbm(nH, u * 20));
+      };
+      const bankY = (x) => H * (portrait ? 0.86 : 0.85) + H * 0.012 * Math.sin((x / W) * 2.3 + 2) + H * 0.008 * fbm(nB, x * 0.01);
+      const trailY = (x) => bankY(x) + H * 0.032;
+      const farPts = sample(-6, W + 6, 3, farR), masPts = sample(-6, W + 6, 3, massif), hillPts = sample(-6, W + 6, 3, hills);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 4150, 4151, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.01, H * 0.4, 0.55);
+        waterStrokes(pen, W, wY, bottomWater, 1.3);
+      }
+      const lw = Math.min(W * 0.34, H * 0.5);
+      const lens = [0, 1, 2].map((i) => ({
+        L: lensCloud(4160 + i * 7, lw * (1 - i * 0.2), lw * 0.32, k, res), w: lw * (1 - i * 0.2), h: lw * 0.32,
+        y: H * (0.04 + i * 0.09), x0: W * (0.1 + i * 0.4), v: (18 + i * 6) * k,
+      }));
+      const ripples = makeRipples(4180, 300, W, wY, depth, k);
+      const grass = makeGrass(4190, W, bankY, k, { h: 13, tallP: 0.35, step: 3.2 });
+      const mist = { L: mistSprite(4170, Math.ceil(W * 1.5), Math.ceil(H * 0.06), 40), y: tBase - H * 0.06, v: 22 * k, a: 0.75 };
+
+      const st = { W, H, land: [], fg: [], wind: 2 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res);
+        const pen = new Pencil(land.c, 4200, seedJ, k);
+        drawRange(pen, {
+          pts: farPts, base: wY + 1, fill: '#EEE7DA', hatchCol: PAL.g2, hatchA: 0.45, fallA: 0.4,
+          fallEvery: 2, fallDensity: 0.6, hatchEvery: 1, hatchFrom: 0.5, crossFrom: 0.85, strata: 2, maxFall: H * 0.06,
+          lineW: 0.9, lineCol: PAL.g2, lineA: 0.9, snowY: wY - H * hf * 0.2,
+          shade: (x, y, sl) => 0.3 + 0.6 * Math.tanh(sl * 1.5) + 0.2 * nA(x * 0.03),
+        });
+        for (const [i, t] of towers.entries()) graniteTower(pen, t.x, tBase + H * 0.06, t.top, t.w, 4300 + i);
+        drawRange(pen, {
+          pts: masPts, base: wY + 1, fill: '#E7DFCF', hatchCol: PAL.g1, hatchA: 0.55, fallA: 0.5,
+          fallEvery: 1, fallDensity: 0.85, hatchEvery: 1, hatchFrom: 0.42, crossFrom: 0.72,
+          bandH: H * 0.04, bandA: 0.3, strata: 6, maxFall: H * 0.09,
+          lineW: 1.2, lineCol: PAL.ink, lineA: 0.95,
+          shade: (x, y, sl) => 0.45 + 0.35 * Math.tanh(sl * 1.4) + 0.25 * nM(x * 0.02),
+        });
+        drawRange(pen, {
+          pts: hillPts, base: wY + 1, fill: '#E4DBCA', hatchCol: PAL.g1, hatchA: 0.5, fallA: 0.4,
+          fallEvery: 2, fallDensity: 0.6, hatchEvery: 1, hatchFrom: 0.5, crossFrom: 0.85,
+          bandH: H * 0.015, bandA: 0.35, strata: 3, lineW: 1.1, lineCol: PAL.g1, lineA: 0.95,
+          shade: (x, y, sl) => 0.4 + 0.3 * Math.tanh(sl * 2) + 0.2 * nH(x * 0.03),
+        });
+        const gs = clamp(H / 900, 0.6, 1.2);
+        guanaco(pen, W * 0.12, hills(W * 0.12) + 2, gs, 1);
+        guanaco(pen, W * 0.16, hills(W * 0.16) + 3, gs * 0.9, -1);
+        guanaco(pen, W * 0.86, hills(W * 0.86) + 2, gs * 0.95, -1);
+        pen.path(sample(-4, W + 4, 6, () => wY), { w: 0.9, col: PAL.g1, a: 0.8, gap: 0.08, jit: 0.5 });
+        st.land.push(land);
+
+        const fg = makeLayer(W, H, res);
+        const pf = new Pencil(fg.c, 4400, seedJ + 5, k);
+        drawBank(pf, W, H, bankY, trailY, { rocks: 3, grass: false, tone: 1.2 });
+        bush(pf, W * 0.07, bankY(W * 0.07) + 10 * k, 22 * k);
+        bush(pf, W * 0.8, bankY(W * 0.8) + 8 * k, 16 * k);
+        bush(pf, W * 0.95, bankY(W * 0.95) + 12 * k, 26 * k);
+        st.fg.push(fg);
+      });
+
+      st.ground = trailY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        for (const l of lens) {
+          const span = W + l.w * 2;
+          ctx.drawImage(l.L.cv, wrap(l.x0 + t * l.v, span) - l.w, l.y, l.w, l.h);
+        }
+        ctx.drawImage(land.cv, 0, 0, W, H);
+        drawMist(ctx, mist, t);
+        reflect(ctx, land, wY, depth, t, k, { alpha: 0.3, amp: 2.2, speed: 2.2 });
+        drawRipples(ctx, ripples, t, W, k, { speed: 2.5, chop: 1 });
+
+        // condor planando em círculos largos
+        const cx = W * 0.72 + Math.cos(t * 0.18) * W * 0.12, cy = H * 0.22 + Math.sin(t * 0.18) * H * 0.05;
+        const s = 18 * k, tilt = Math.cos(t * 0.18) * 0.15, dip = Math.sin(t * 0.7) * 1.5 * k;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(tilt);
+        ctx.beginPath();
+        ctx.moveTo(-s, -2 * k + dip);
+        ctx.quadraticCurveTo(-s * 0.5, -s * 0.12, -s * 0.1, 0);
+        ctx.lineTo(s * 0.1, 0);
+        ctx.quadraticCurveTo(s * 0.5, -s * 0.12, s, -2 * k + dip);
+        ctx.quadraticCurveTo(s * 0.5, s * 0.05, s * 0.08, s * 0.12);
+        ctx.lineTo(-s * 0.08, s * 0.12);
+        ctx.quadraticCurveTo(-s * 0.5, s * 0.05, -s, -2 * k + dip);
+        ctx.fillStyle = PAL.g1;
+        ctx.fill();
+        ctx.strokeStyle = PAL.ink;
+        ctx.lineWidth = 0.9 * k;
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+        drawGrass(ctx, grass, t, k, 2);
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia];
 
   /*<T>*/
   /* ================================================================
