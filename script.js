@@ -2556,8 +2556,215 @@
     },
   };
 
+  /* ---------- Cena VIII · Capadócia (Göreme, Turquia) ---------- */
+
+  /** Chaminé de fada: cone de tufo com chapéu de rocha escura, janelas escavadas. */
+  function fairyChimney(pen, x, baseY, h, w, windows = 0) {
+    const c = pen.c, S = pen.S, k = pen.k, n = 16, left = [], right = [];
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, y = baseY - f * h * 0.86;
+      const half = (w / 2) * (1 - Math.pow(f, 0.8) * 0.78) * (1 + Math.sin(f * 9 + x) * 0.03);
+      left.push([x - half, y]);
+      right.push([x + half, y]);
+    }
+    const pts = [...left, ...right.reverse()];
+    const p = new Path2D();
+    pts.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+    p.closePath();
+    c.fillStyle = '#ECE4D5';
+    c.fill(p);
+    c.save();
+    c.clip(p);
+    const hs = [], strata = [];
+    for (let xx = x - w * 0.05; xx < x + w / 2; xx += 1.8 * k) hs.push([xx, baseY, xx - w * 0.06, baseY - h]);
+    for (let i = 0; i < 5; i++) { const y = baseY - h * (0.1 + S() * 0.6); strata.push([x - w / 2, y, x + w / 2, y + (S() - 0.5) * 3]); }
+    pen.lines(hs, { w: 0.6, col: PAL.g1, a: 0.5 });
+    pen.lines(strata, { w: 0.5, col: PAL.g2, a: 0.6 });
+    c.fillStyle = PAL.ink;
+    for (let i = 0; i < windows; i++) {
+      const wy = baseY - h * (0.15 + S() * 0.45), wx = x + (S() - 0.5) * w * 0.35, ww = (2 + S() * 2.5) * k, wh = ww * 1.4;
+      c.beginPath();
+      c.moveTo(wx - ww / 2, wy);
+      c.lineTo(wx - ww / 2, wy - wh * 0.6);
+      c.arc(wx, wy - wh * 0.6, ww / 2, Math.PI, TAU);
+      c.lineTo(wx + ww / 2, wy);
+      c.closePath();
+      c.fill();
+    }
+    c.restore();
+    pen.path(left, { w: 1, col: PAL.ink, passes: 1, jit: 0.3 });
+    pen.path(right, { w: 1, col: PAL.ink, passes: 1, jit: 0.3 });
+    // chapéu
+    const capY = baseY - h * 0.86, cw = w * 0.3, ch = Math.max(3 * k, h * 0.07), cap = [];
+    for (let a = 0; a <= TAU + 0.1; a += 0.2) cap.push([x + Math.cos(a) * cw, capY - ch * 0.4 + Math.sin(a) * ch * (Math.sin(a) < 0 ? 1.1 : 0.5)]);
+    const cp = new Path2D();
+    cap.forEach((q, i) => (i ? cp.lineTo(q[0], q[1]) : cp.moveTo(q[0], q[1])));
+    c.fillStyle = PAL.g1;
+    c.fill(cp);
+    pen.path(cap, { w: 0.9, col: PAL.ink, passes: 1, jit: 0.2 });
+  }
+
+  /** Balão de ar quente (sprite): gomos alternados, sombra à direita, cesto e cordas. */
+  function balloonSprite(design, s, k, res) {
+    const L = makeLayer(s, s, res), c = L.c, pen = new Pencil(c, 8400 + design, 8410 + design, k);
+    const cx = s / 2, r = s * 0.34, top = s * 0.03, throat = s * 0.78;
+    const halfW = (v) => (v < 0.45 ? r * Math.sqrt(Math.max(0, 1 - ((0.45 - v) / 0.45) ** 2)) : r - (r - s * 0.08) * Math.pow((v - 0.45) / 0.55, 1.3));
+    const yAt = (v) => top + v * (throat - top);
+    const gores = 8, tones = [[PAL.paper, PAL.g3], [PAL.paper, PAL.g1], [PAL.g3, PAL.paper2]][design % 3];
+    for (let i = 0; i < gores; i++) {
+      const a0 = -Math.PI / 2 + (i / gores) * Math.PI, a1 = -Math.PI / 2 + ((i + 1) / gores) * Math.PI, pts = [];
+      for (let j = 0; j <= 20; j++) { const v = j / 20; pts.push([cx + halfW(v) * Math.sin(a0), yAt(v)]); }
+      for (let j = 20; j >= 0; j--) { const v = j / 20; pts.push([cx + halfW(v) * Math.sin(a1), yAt(v)]); }
+      const p = new Path2D();
+      pts.forEach((q, j) => (j ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+      p.closePath();
+      c.fillStyle = tones[i % 2];
+      c.fill(p);
+      if (i >= gores / 2) {
+        c.save();
+        c.clip(p);
+        const hs = [];
+        for (let y = 0; y < s; y += 1.6) hs.push([0, y, s, y + s * 0.5]);
+        pen.lines(hs, { w: 0.45, col: PAL.ink, a: 0.08 + (i - gores / 2) * 0.1 });
+        c.restore();
+      }
+      pen.path(pts.slice(0, 21), { w: 0.6, col: PAL.ink, a: 0.75, passes: 1, jit: 0.15 });
+    }
+    const band = [];
+    for (let a = -Math.PI / 2; a <= Math.PI / 2; a += 0.1) band.push([cx + halfW(0.6) * Math.sin(a), yAt(0.6) + Math.cos(a) * s * 0.012]);
+    pen.path(band, { w: 0.7, col: PAL.ink, passes: 1, jit: 0.1 });
+    const outline = [];
+    for (let j = 0; j <= 30; j++) { const v = j / 30; outline.push([cx - halfW(v), yAt(v)]); }
+    for (let j = 30; j >= 0; j--) { const v = j / 30; outline.push([cx + halfW(v), yAt(v)]); }
+    pen.path(outline, { w: 1, col: PAL.ink, passes: 2, jit: 0.2 });
+    const bx = s * 0.055, by0 = s * 0.86, by1 = s * 0.94;
+    c.fillStyle = PAL.g1;
+    c.fillRect(cx - bx, by0, bx * 2, by1 - by0);
+    pen.lines([[cx - s * 0.08, throat, cx - bx, by0], [cx + s * 0.08, throat, cx + bx, by0], [cx - bx, by0, cx + bx, by0], [cx - bx, by1, cx + bx, by1]], { w: 0.6, col: PAL.ink, wob: 0.1 });
+    return L;
+  }
+
+  const Cappadocia = {
+    id: 'capadocia',
+    numeral: 'VIII',
+    place: 'Göreme, Capadócia',
+    meta: 'Turquia · 38°38′N 34°49′E',
+    mood: 'onírica, leve',
+    duration: 30,
+    stopAt: 0.58,
+    stopAtPortrait: 0.55,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hY = H * (portrait ? 0.5 : 0.48), wf = portrait ? clamp(H / W / 1.4, 1, 1.7) : 1;
+      const nP = noise1(rng(8101)), nV = noise1(rng(8102)), nM = noise1(rng(8103)), nB = noise1(rng(8104));
+      const plateau = (x) => {
+        const u = x / W;
+        const cone = (portrait ? 0.09 : 0.12) * Math.pow(Math.max(0, 1 - Math.abs(u - 0.8) / (0.12 * wf)), 1.4);
+        return hY - H * (0.02 + cone + 0.006 * fbm(nP, u * 30) + 0.02 * smooth(0.1, 0.3, u) * (1 - smooth(0.55, 0.65, u)));
+      };
+      const valley = (x) => {
+        const u = x / W;
+        return H * 0.6 - H * (0.05 * Math.abs(Math.sin(u * 7 + 1)) + 0.03 * bell(u, 0.3, 0.2) + 0.01 * fbm(nV, u * 20));
+      };
+      const mid = (x) => {
+        const u = x / W;
+        return H * 0.7 - H * (0.06 * Math.abs(Math.sin(u * 5 + 2.2)) + 0.02 * fbm(nM, u * 18));
+      };
+      const bankY = (x) => H * (portrait ? 0.85 : 0.84) + H * 0.008 * Math.sin((x / W) * 2.6 + 1) + H * 0.006 * fbm(nB, x * 0.01);
+      const trailY = (x) => bankY(x) + H * 0.034;
+      const platPts = sample(-6, W + 6, 3, plateau), valPts = sample(-6, W + 6, 3, valley), midPts = sample(-6, W + 6, 3, mid);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 8150, 8151, k), S = pen.S;
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.01, H * 0.3, 0.4);
+        const sx = W * 0.17, r = Math.min(W, H) * 0.07;
+        sunDisc(pen, sx, hY - H * 0.02, r, 2);
+        const rays = [];
+        for (let i = 0; i < 18; i++) {
+          const a = -Math.PI + (i / 17) * Math.PI, r0 = r * 1.8, r1 = r * (2.6 + S() * 1.6);
+          rays.push([sx + Math.cos(a) * r0, hY - H * 0.02 + Math.sin(a) * r0, sx + Math.cos(a) * r1, hY - H * 0.02 + Math.sin(a) * r1]);
+        }
+        pen.lines(rays, { w: 0.6, col: PAL.g3, a: 0.6 });
+      }
+      const bs = Math.min(W, H) * 0.16;
+      const designs = [0, 1, 2].map((d) => balloonSprite(d, bs, k, res));
+      const rb = rng(8180);
+      const balloons = Array.from({ length: portrait ? 10 : 15 }, (_, i) => {
+        const d = rb();
+        return { d, size: bs * (0.18 + d * 0.62), x: rb() * W, y0: rb(), v: (4 + d * 10) * k, ph: rb() * TAU, des: i % 3 };
+      }).sort((a, b) => a.d - b.d);
+      const mist = { L: mistSprite(8170, Math.ceil(W * 1.5), Math.ceil(H * 0.08), 60), y: H * 0.58, v: 4 * k, a: 0.85 };
+
+      const st = { W, H, land: [], fg: [], wind: 0.5 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res);
+        const pen = new Pencil(land.c, 8200, seedJ, k), S = pen.S;
+        drawRange(pen, {
+          pts: platPts, base: hY + H * 0.02, fill: '#EEE8DC', hatchCol: PAL.g2, hatchA: 0.45, fallA: 0.35,
+          fallEvery: 2, fallDensity: 0.35, hatchEvery: 1, hatchFrom: 0.45, crossFrom: 0.9, strata: 4, maxFall: H * 0.04,
+          lineW: 0.8, lineCol: PAL.g2, lineA: 0.9, snowY: hY - H * 0.09,
+          shade: (x, y, sl) => 0.25 + 0.5 * Math.tanh(sl * 2) + 0.15 * nP(x * 0.03),
+        });
+        drawRange(pen, {
+          pts: valPts, base: H * 0.72, fill: '#EAE2D3', hatchCol: PAL.g1, hatchA: 0.45, fallA: 0.35,
+          fallEvery: 2, fallDensity: 0.4, hatchEvery: 1, hatchFrom: 0.5, crossFrom: 0.85, strata: 14, maxFall: H * 0.04, maxHatch: H * 0.05,
+          lineW: 1, lineCol: PAL.g1, lineA: 0.95,
+          shade: (x, y, sl) => 0.35 + 0.4 * Math.tanh(sl * 2.5) + 0.2 * nV(x * 0.03),
+        });
+        const cones = [];
+        for (let i = 0; i < (portrait ? 9 : 16); i++) cones.push([S() * W, 0.5 + S() * 0.5, S()]);
+        cones.sort((a, b) => a[1] - b[1]);
+        for (const [x, d] of cones) {
+          const h = H * (0.05 + d * 0.08), w = h * (0.45 + S() * 0.2);
+          fairyChimney(pen, x, valley(x) + H * 0.03 + d * H * 0.03, h, w, Math.floor(S() * 3));
+        }
+        drawRange(pen, {
+          pts: midPts, base: H * 0.88, fill: '#E6DDCC', hatchCol: PAL.g1, hatchA: 0.5, fallA: 0.4,
+          fallEvery: 2, fallDensity: 0.5, hatchEvery: 1, hatchFrom: 0.45, crossFrom: 0.8, strata: 16, maxFall: H * 0.05, maxHatch: H * 0.06,
+          lineW: 1.1, lineCol: PAL.ink, lineA: 0.95,
+          shade: (x, y, sl) => 0.4 + 0.4 * Math.tanh(sl * 2.5) + 0.2 * nM(x * 0.03),
+        });
+        st.land.push(land);
+
+        const fg = makeLayer(W, H, res);
+        const pf = new Pencil(fg.c, 8300, seedJ + 5, k);
+        drawBank(pf, W, H, bankY, trailY, { rocks: 4, tone: 0.9 });
+        fairyChimney(pf, W * (portrait ? 0.06 : 0.08), H * 1.02, H * 0.55, H * 0.24, 5);
+        fairyChimney(pf, W * (portrait ? 0.96 : 0.93), H * 1.03, H * 0.34, H * 0.16, 3);
+        st.fg.push(fg);
+      });
+
+      const drawBalloons = (ctx, t, from, to) => {
+        for (const b of balloons) {
+          if (b.d < from || b.d >= to) continue;
+          const span = H * 1.25;
+          const y = wrap(b.y0 * span - t * b.v, span) - H * 0.2;
+          const x = b.x + Math.sin(t * 0.25 + b.ph) * 12 * k + t * 2 * k * (b.d - 0.5);
+          ctx.drawImage(designs[b.des].cv, x - b.size / 2, y, b.size, b.size);
+        }
+      };
+
+      st.ground = trailY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        drawBalloons(ctx, t, 0, 0.55);
+        ctx.drawImage(land.cv, 0, 0, W, H);
+        drawMist(ctx, mist, t);
+        drawBalloons(ctx, t, 0.55, 1.01);
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya, Savanna, Cappadocia];
 
   /*<T>*/
   /* ================================================================
