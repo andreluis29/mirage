@@ -6,6 +6,7 @@
  *   0. Paleta e utilidades (aleatório com semente, ruído)
  *   1. Lápis: traços tremidos, hachuras em lote
  *   2. Peças de desenho reutilizáveis (cordilheira, nuvem, pinheiro, névoa…)
+ *  2b. Peças comuns às cenas (margem, reflexo, ondas, aves, capim, partículas)
  *   3. Cenas (cada uma: build() desenha camadas estáticas; draw() anima)
  *   4. Viajante (SVG)
  *   5. Motor: laço de 60 fps, transições, controles, acessibilidade
@@ -440,6 +441,280 @@
   }
 
   /* ================================================================
+   * 2b. Peças comuns às cenas (estáticas e animadas)
+   * ================================================================ */
+
+  /** Céu: riscos horizontais leves, mais densos no alto. */
+  function skyStrokes(pen, W, y0, y1, dens = 0.5) {
+    const S = pen.S, L = [];
+    for (let y = y0; y < y1; y += 6 * pen.k) {
+      const p = dens * (1 - (y - y0) / (y1 - y0));
+      let x = -10;
+      while (x < W) {
+        const len = 30 + S() * 140;
+        if (S() < p) L.push([x, y + S() * 2, x + len, y + (S() - 0.5) * 3]);
+        x += len + 10 + S() * 60;
+      }
+    }
+    pen.lines(L, { w: 0.6, col: PAL.g3, a: 0.4 });
+  }
+
+  /** Água parada: riscos longos, mais frequentes perto de quem olha. */
+  function waterStrokes(pen, W, wY, y1, dens = 1) {
+    const S = pen.S, L = [];
+    for (let y = wY + 3; y < y1; y += 4 * pen.k) {
+      const t = (y - wY) / (y1 - wY);
+      let x = -10;
+      while (x < W) {
+        const len = 20 + S() * 120;
+        if (S() < (0.2 + t * 0.45) * dens) L.push([x, y, x + len, y + (S() - 0.5) * 1.5]);
+        x += len + S() * 50;
+      }
+    }
+    pen.lines(L, { w: 0.6, col: PAL.g3, a: 0.45 });
+  }
+
+  /** Sol desenhado: disco de papel, contorno duplo e meia auréola. */
+  function sunDisc(pen, sx, sy, r, rings = 1) {
+    const c = pen.c;
+    c.fillStyle = PAL.paper;
+    c.beginPath();
+    c.arc(sx, sy, r * 1.15, 0, TAU);
+    c.fill();
+    const circ = [];
+    for (let a = 0; a <= TAU + 0.15; a += 0.08) circ.push([sx + Math.cos(a) * r, sy + Math.sin(a) * r]);
+    pen.path(circ, { w: 1, col: PAL.g1, a: 0.85, gap: 0.01 });
+    for (let i = 1; i <= rings; i++) {
+      const rr = r * (1 + 0.35 * i), arc = [];
+      for (let a = 0.6 - i * 0.3; a <= 2.6 + i * 0.3; a += 0.08) arc.push([sx + Math.cos(a) * rr, sy + Math.sin(a) * rr]);
+      pen.path(arc, { w: 0.6, col: PAL.g3, a: 0.7 / i, passes: 1 });
+    }
+  }
+
+  /** Margem de terra: tom hachurado, trilha limpa, pedras, borda e capim. */
+  function drawBank(pen, W, H, bankY, trailY, o = {}) {
+    const c = pen.c, S = pen.S, k = pen.k;
+    const top = sample(-6, W + 6, 3, bankY);
+    const poly = new Path2D();
+    poly.moveTo(-6, H + 6);
+    top.forEach((p) => poly.lineTo(p[0], p[1]));
+    poly.lineTo(W + 6, H + 6);
+    poly.closePath();
+    c.fillStyle = o.fill || PAL.paper;
+    c.fill(poly);
+    c.save();
+    c.clip(poly);
+    const tone = [], tone2 = [], dens = o.tone == null ? 1 : o.tone, ang0 = o.angle == null ? -1.1 : o.angle;
+    const nCl = Math.round(((W * (H - bankY(W / 2))) / (60 * k * k)) * dens);
+    for (let i = 0; i < nCl; i++) {
+      const px = S() * W, py = bankY(px) + 3 + S() * (H - bankY(px));
+      const t = (py - bankY(px)) / (H - bankY(px));
+      if (S() > 0.35 + t * 0.6) continue;
+      const ang = ang0 + (S() - 0.5) * 0.5, L = (5 + S() * 7) * k, n = 3 + Math.floor(S() * 4);
+      for (let j = 0; j < n; j++) {
+        const ox = px + j * 2.2 * k;
+        (t > 0.55 ? tone2 : tone).push([ox, py, ox + Math.cos(ang) * L, py + Math.sin(ang) * L]);
+      }
+    }
+    pen.lines(tone, { w: 0.65, col: PAL.g1, a: 0.5 });
+    pen.lines(tone2, { w: 0.7, col: PAL.ink, a: 0.45 });
+    if (trailY) {
+      const trail = sample(-6, W + 6, 6, trailY);
+      pen.path(trail, { w: 9, col: PAL.paper, a: 1, passes: 1, gap: 0, jit: 0.4 });
+      pen.path(trail.map((p) => [p[0], p[1] - 4.5 * k]), { w: 0.6, col: PAL.g2, a: 0.7, passes: 1, gap: 0.25 });
+      pen.path(trail.map((p) => [p[0], p[1] + 5 * k]), { w: 0.6, col: PAL.g2, a: 0.7, passes: 1, gap: 0.3 });
+    }
+    c.restore();
+    const nRocks = o.rocks == null ? 6 : o.rocks;
+    for (let i = 0; i < nRocks; i++) {
+      const rx = W * (0.08 + i * (0.96 / nRocks) + S() * 0.08), r = (5 + S() * 9) * k;
+      rock(pen, rx, bankY(rx) + 3 * k + S() * 6 * k, r);
+    }
+    pen.path(top, { w: 1.3, col: PAL.ink, a: 0.95, gap: 0.03, jit: 0.6 });
+    if (o.grass !== false) {
+      const grass = [];
+      for (let x = -4; x < W + 4; x += 2.2) {
+        if (S() < 0.55) {
+          const y = bankY(x) + 1, h = (2 + S() * 8) * k * (S() < 0.1 ? 1.8 : 1);
+          grass.push([x, y, x + (S() - 0.3) * 4 * k, y - h]);
+        }
+      }
+      pen.lines(grass, { w: 0.7, col: PAL.ink, a: 0.75, wob: 0.5 });
+    }
+    return top;
+  }
+
+  /** Reflexo: faixas finas da camada, espelhadas, achatadas e onduladas. */
+  function reflect(ctx, layer, wY, depth, t, k, o = {}) {
+    const a = o.alpha == null ? 0.36 : o.alpha, comp = o.comp || 0.72, amp = o.amp || 1, sp = o.speed || 1;
+    const lr = layer.res, srcH = (2 / comp) * lr;
+    ctx.globalAlpha = a;
+    for (let y = 0; y < depth; y += 2) {
+      const sy = wY - (y + 2) / comp;
+      if (sy < 0) break;
+      const d = y / depth;
+      const off = (Math.sin(y * 0.13 - t * 1.4 * sp) * 0.9 + Math.sin(y * 0.047 + t * 0.6 * sp) * 1.6) * (0.35 + d * 1.8) * k * amp;
+      ctx.drawImage(layer.cv, 0, sy * lr, layer.cv.width, srcH, off, wY + y, layer.w, 2.2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Ondulações: traços curtos que derivam; alguns são brilhos de papel. */
+  function makeRipples(seed, n, W, wY, depth, k) {
+    const r = rng(seed), out = [];
+    for (let i = 0; i < n; i++) {
+      const d = Math.pow(r(), 1.6);
+      out.push({ x: r() * (W + 60) - 30, y: wY + 4 + d * (depth - 4), d, len: (5 + d * 55 + r() * 20) * k * 0.8, ph: r() * TAU, glint: r() < 0.22, b: i % 3 });
+    }
+    return out;
+  }
+  function drawRipples(ctx, rip, t, W, k, o = {}) {
+    const sp = o.speed || 1, chop = o.chop || 0;
+    const alphas = [0.22, 0.36, 0.5];
+    const to = (r) => {
+      const span = W + 60;
+      const x = (((r.x + t * 2 * k * sp + Math.sin(t * 0.35 * sp + r.ph) * 6 * k * (0.4 + r.d)) % span) + span) % span - 30;
+      const L = r.len * (0.75 + 0.25 * Math.sin(t * 0.9 * sp + r.ph * 2));
+      const lift = chop ? (1.5 + chop * 2.5) * k * (0.5 + 0.5 * Math.sin(t * 3 * sp + r.ph * 3)) : 0;
+      ctx.moveTo(x, r.y);
+      ctx.quadraticCurveTo(x + L / 2, r.y + 0.8 * k * Math.sin(r.ph + t) - lift, x + L, r.y);
+    };
+    ctx.lineCap = 'round';
+    for (let b = 0; b < 3; b++) {
+      ctx.beginPath();
+      for (const r of rip) if (r.b === b && !r.glint) to(r);
+      ctx.strokeStyle = PAL.g1;
+      ctx.globalAlpha = alphas[b];
+      ctx.lineWidth = 0.9 * k;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    for (const r of rip) if (r.glint) to(r);
+    ctx.strokeStyle = PAL.paper;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.4 * k;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  /** Aves em "m" batendo asas, atravessando o céu. dir = -1 voam para a esquerda. */
+  function makeBirds(seed, n, W, H, y0, y1, k, o = {}) {
+    const r = rng(seed), out = [];
+    for (let i = 0; i < n; i++) {
+      out.push({ x0: r() * W, y: H * (y0 + r() * (y1 - y0)), v: ((o.speed || 14) + r() * 10) * k, s: ((o.size || 5) + r() * 3) * k, f: 5 + r() * 3, ph: r() * TAU });
+    }
+    return out;
+  }
+  function drawBirds(ctx, birds, t, W, k, dir = -1) {
+    ctx.beginPath();
+    for (const b of birds) {
+      const span = W + 200;
+      const p = (((b.x0 + t * b.v) % span) + span) % span;
+      const x = dir < 0 ? W + 100 - p : p - 100;
+      const y = b.y + Math.sin(t * 0.5 + b.ph) * 6 * k;
+      const s = b.s, f = Math.sin(t * b.f + b.ph) * s * 0.5;
+      ctx.moveTo(x - s, y - f);
+      ctx.quadraticCurveTo(x - s * 0.45, y - s * 0.35 - f * 0.3, x, y);
+      ctx.quadraticCurveTo(x + s * 0.45, y - s * 0.35 - f * 0.3, x + s, y - f);
+    }
+    ctx.strokeStyle = PAL.ink;
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1.1 * k;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  /** Nuvens cúmulo que derivam com o vento. */
+  function makeClouds(seed, n, W, H, k, res, o = {}) {
+    const size = o.size || Math.min(W * 0.3, H * 0.5);
+    return Array.from({ length: n }, (_, i) => {
+      const w = size * (0.75 + (i % 3) * 0.15), h = w * 0.42;
+      return {
+        L: cloudSprite(seed + i * 11, w, h, k, res), w, h,
+        y: H * ((o.y0 == null ? 0.06 : o.y0) + i * (o.dy == null ? 0.075 : o.dy)),
+        x0: W * (0.15 + i * 0.37), v: ((o.speed || 4) + i * 2.5) * k,
+      };
+    });
+  }
+  function drawClouds(ctx, clouds, t, W) {
+    for (const cl of clouds) {
+      const span = W + cl.w * 2;
+      const x = (((cl.x0 + t * cl.v) % span) + span) % span - cl.w;
+      ctx.drawImage(cl.L.cv, x, cl.y, cl.w, cl.h);
+    }
+  }
+
+  function drawMist(ctx, m, t) {
+    const w = m.L.w;
+    const x = -((((t * m.v) % w) + w) % w);
+    ctx.globalAlpha = m.a;
+    ctx.drawImage(m.L.cv, x, m.y, w, m.L.h);
+    ctx.drawImage(m.L.cv, x + w, m.y, w, m.L.h);
+    ctx.globalAlpha = 1;
+  }
+
+  /** Capim alto animado: lâminas que dobram com o vento (desenhadas a cada quadro). */
+  function makeGrass(seed, W, groundY, k, o = {}) {
+    const r = rng(seed), out = [], step = (o.step || 2.6) * k;
+    for (let x = -10; x < W + 10; x += step * (0.5 + r())) {
+      const tall = r() < (o.tallP || 0.25);
+      out.push({ x, y: groundY(x) + r() * (o.depth || 6) * k, h: ((o.h || 10) * (tall ? 1.8 : 1) * (0.5 + r())) * k, lean: (r() - 0.3) * 4 * k, ph: r() * TAU, b: tall ? 1 : 0 });
+    }
+    return out;
+  }
+  function drawGrass(ctx, blades, t, k, wind = 1, col = PAL.ink) {
+    for (let b = 0; b < 2; b++) {
+      ctx.beginPath();
+      for (const g of blades) {
+        if (g.b !== b) continue;
+        const sway = (Math.sin(t * 2.2 * wind + g.x * 0.025 + g.ph * 0.3) * 0.6 + Math.sin(t * 5.1 + g.ph) * 0.15) * g.h * 0.35 * wind;
+        const tx = g.x + g.lean + sway, ty = g.y - g.h + Math.abs(sway) * 0.3;
+        ctx.moveTo(g.x, g.y);
+        ctx.quadraticCurveTo(g.x + g.lean * 0.5, g.y - g.h * 0.55, tx, ty);
+      }
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = b ? 0.85 : 0.6;
+      ctx.lineWidth = (b ? 0.9 : 0.7) * k;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Padrão de hachura para preencher figuras animadas (animais, balões). */
+  function hatchPattern(ctx, bg, ink, gap = 3, angle = 0.7, w = 0.7) {
+    const s = Math.max(4, Math.round(gap * 4));
+    const L = makeLayer(s, s, 1), c = L.c;
+    c.fillStyle = bg;
+    c.fillRect(0, 0, s, s);
+    c.strokeStyle = ink;
+    c.lineWidth = w;
+    c.beginPath();
+    for (let i = -s; i <= s * 2; i += gap) { c.moveTo(i, 0); c.lineTo(i + s * Math.tan(angle), s); }
+    c.stroke();
+    return ctx.createPattern(L.cv, 'repeat');
+  }
+
+  /** Partículas que caem/derivam em laço (neve, chuva, pétalas, areia). */
+  function makeParticles(seed, n) {
+    const r = rng(seed);
+    return Array.from({ length: n }, () => ({ x: r(), y: r(), v: 0.6 + r() * 0.8, s: 0.6 + r() * 0.8, ph: r() * TAU }));
+  }
+  const wrap = (v, m) => ((v % m) + m) % m;
+
+  /** Gerencia variantes de "boil": paint(seedJ) desenha uma variante de cada camada animada. */
+  function withVariants(st, paint, max = 3) {
+    st.count = 0;
+    st.addVariant = () => {
+      if (st.count >= max) return false;
+      paint(1000 + st.count * 97);
+      st.count++;
+      return st.count < max;
+    };
+    st.addVariant();
+    return st;
+  }
+
+  /* ================================================================
    * 3. Cenas
    *    Contrato de uma cena:
    *      id, numeral, place, meta, mood, duration (s), stopAt (0–1)
@@ -448,6 +723,8 @@
    *        ground(x)              altura do chão onde o viajante pisa
    *        addVariant()           desenha mais uma variante de "boil"; false quando acabou
    *        count                  variantes prontas
+   *        wind                   (opcional) força do vento no cachecol do viajante
+   *    env = { W, H, res, k }: tamanho em px CSS, densidade de pixels, escala do traço
    * ================================================================ */
 
   /* ---------- Cena I · Fiordes (Geirangerfjord, Noruega) ---------- */
@@ -466,7 +743,7 @@
       const hf = portrait ? 0.8 : 1;                       // montanhas um pouco mais baixas no retrato
       const wf = portrait ? clamp(H / W / 1.4, 1, 1.7) : 1; // e mais largas, para não virarem agulhas
       const wY = H * (portrait ? 0.58 : 0.6);               // linha d'água
-      const bottomWater = H * 0.87;
+      const bottomWater = H * 0.87, depth = bottomWater - wY;
 
       const nF = noise1(rng(101)), nL = noise1(rng(202)), nR = noise1(rng(303));
       const nN = noise1(rng(404)), nB = noise1(rng(606));
@@ -504,7 +781,6 @@
         midR: sample(W * 0.43, W + 6, step, midR),
         midL: sample(-6, W * 0.53, step, midL),
         near: sample(-6, W * 0.37, step, near),
-        bank: sample(-6, W + 6, step, bankY),
       };
       const fallX = W * 0.735;
       const falls = [0, 1, 2].map((i) => {
@@ -516,68 +792,28 @@
       // ---- céu + água de fundo (uma variante só) ----
       const sky = makeLayer(W, H, res);
       {
-        const c = sky.c, pen = new Pencil(c, 55, 56, k), S = pen.S;
-        c.fillStyle = PAL.paper;
-        c.fillRect(0, 0, W, H);
-        const skyL = [];
-        for (let y = H * 0.015; y < H * 0.3; y += 6 * k) {
-          const p = 0.5 * (1 - y / (H * 0.3));
-          let x = -10;
-          while (x < W) { const L = 30 + S() * 140; if (S() < p) skyL.push([x, y + S() * 2, x + L, y + (S() - 0.5) * 3]); x += L + 10 + S() * 60; }
-        }
-        pen.lines(skyL, { w: 0.6, col: PAL.g3, a: 0.4 });
-        // sol baixo, atrás dos picos
-        const sx = W * (portrait ? 0.62 : 0.3), sy = H * (portrait ? 0.27 : 0.2), r = Math.min(W, H) * 0.045;
-        c.fillStyle = PAL.paper;
-        c.beginPath();
-        c.arc(sx, sy, r * 1.15, 0, TAU);
-        c.fill();
-        const circ = [];
-        for (let a = 0; a <= TAU + 0.15; a += 0.08) circ.push([sx + Math.cos(a) * r, sy + Math.sin(a) * r]);
-        pen.path(circ, { w: 1, col: PAL.g1, a: 0.85, gap: 0.01 });
-        const halo = [];
-        for (let a = 0.6; a <= 2.6; a += 0.08) halo.push([sx + Math.cos(a) * r * 1.35, sy + Math.sin(a) * r * 1.35]);
-        pen.path(halo, { w: 0.6, col: PAL.g3, a: 0.7, passes: 1 });
-        // traços horizontais da água
-        const wl = [];
-        for (let y = wY + 3; y < bottomWater; y += 4 * k) {
-          const t = (y - wY) / (bottomWater - wY);
-          let x = -10;
-          while (x < W) { const L = 20 + S() * 120; if (S() < 0.2 + t * 0.45) wl.push([x, y, x + L, y + (S() - 0.5) * 1.5]); x += L + S() * 50; }
-        }
-        pen.lines(wl, { w: 0.6, col: PAL.g3, a: 0.45 });
+        const pen = new Pencil(sky.c, 55, 56, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.015, H * 0.3);
+        sunDisc(pen, W * (portrait ? 0.62 : 0.3), H * (portrait ? 0.27 : 0.2), Math.min(W, H) * 0.045);
+        waterStrokes(pen, W, wY, bottomWater);
       }
 
-      // ---- nuvens, névoa, barco, respingo ----
-      const cw = Math.min(W * 0.3, H * 0.5);
-      const clouds = [0, 1, 2].map((i) => {
-        const w = cw * (0.75 + i * 0.15), h = w * 0.42;
-        return { L: cloudSprite(31 + i * 11, w, h, k, res), w, h, y: H * (0.06 + i * 0.075), x0: W * (0.15 + i * 0.37), v: (4 + i * 2.5) * k };
-      });
+      // ---- nuvens, névoa, barco, respingo, ondas, aves ----
+      const clouds = makeClouds(31, 3, W, H, k, res);
       const mistLow = { L: mistSprite(71, Math.ceil(W * 1.5), Math.ceil(H * 0.11)), y: wY - H * 0.075, v: 7 * k, a: portrait ? 0.6 : 0.9 };
       const mistHigh = { L: mistSprite(72, Math.ceil(W * 1.5), Math.ceil(H * 0.08), 40), y: H * 0.36, v: -4 * k, a: 0.7 };
       const puff = puffSprite(Math.ceil(26 * k), Math.ceil(12 * k));
       const bw = 34 * k, bh = 40 * k;
       const boat = boatSprite(bw, bh, k, res);
+      const ripples = makeRipples(707, 240, W, wY, depth, k);
+      const birds = makeBirds(808, 5, W, H, 0.12, 0.26, k);
 
-      // ---- ondulações (pré-sorteadas) ----
-      const rr = rng(707), depth = bottomWater - wY, ripples = [];
-      for (let i = 0; i < 240; i++) {
-        const d = Math.pow(rr(), 1.6);
-        ripples.push({ x: rr() * (W + 60) - 30, y: wY + 4 + d * (depth - 4), d, len: (5 + d * 55 + rr() * 20) * k * 0.8, ph: rr() * TAU, glint: rr() < 0.22, b: i % 3 });
-      }
-      const rb = rng(808), birds = [];
-      for (let i = 0; i < 5; i++) {
-        birds.push({ x0: rb() * W, y: H * (0.12 + rb() * 0.14), v: (14 + rb() * 10) * k, s: (5 + rb() * 3) * k, f: 5 + rb() * 3, ph: rb() * TAU });
-      }
-
-      const st = { W, H, wY, count: 0, land: [], fg: [] };
+      const st = { W, H, wY, land: [], fg: [], wind: 0.8 };
 
       // ---- variantes de "boil": terra (montanhas) e primeiro plano ----
-      st.addVariant = () => {
-        if (st.count >= 3) return false;
-        const seedJ = 1000 + st.count * 97;
-
+      withVariants(st, (seedJ) => {
         const land = makeLayer(W, H, res);
         const pen = new Pencil(land.c, 77, seedJ, k);
         drawRange(pen, {
@@ -619,64 +855,15 @@
 
         // primeiro plano: margem com trilha, pedras, capim e abetos
         const fg = makeLayer(W, H, res);
-        const pf = new Pencil(fg.c, 88, seedJ + 5, k), c = fg.c, S = pf.S;
-        const top = geo.bank;
-        const poly = new Path2D();
-        poly.moveTo(-6, H + 6);
-        top.forEach((p) => poly.lineTo(p[0], p[1]));
-        poly.lineTo(W + 6, H + 6);
-        poly.closePath();
-        c.fillStyle = PAL.paper;
-        c.fill(poly);
-        c.save();
-        c.clip(poly);
-        const tone = [], tone2 = [];
-        const nCl = Math.round((W * (H - bankY(W / 2))) / (60 * k * k));
-        for (let i = 0; i < nCl; i++) {
-          const px = S() * W, py = bankY(px) + 3 + S() * (H - bankY(px));
-          const t = (py - bankY(px)) / (H - bankY(px));
-          if (S() > 0.35 + t * 0.6) continue;
-          const ang = -1.1 + (S() - 0.5) * 0.5, L = (5 + S() * 7) * k, n = 3 + Math.floor(S() * 4);
-          for (let j = 0; j < n; j++) {
-            const ox = px + j * 2.2 * k;
-            (t > 0.55 ? tone2 : tone).push([ox, py, ox + Math.cos(ang) * L, py + Math.sin(ang) * L]);
-          }
-        }
-        pf.lines(tone, { w: 0.65, col: PAL.g1, a: 0.5 });
-        pf.lines(tone2, { w: 0.7, col: PAL.ink, a: 0.45 });
-        // trilha: papel limpo com bordas pontilhadas
-        const trail = sample(-6, W + 6, 6, trailY);
-        pf.path(trail, { w: 9, col: PAL.paper, a: 1, passes: 1, gap: 0, jit: 0.4 });
-        pf.path(trail.map((p) => [p[0], p[1] - 4.5 * k]), { w: 0.6, col: PAL.g2, a: 0.7, passes: 1, gap: 0.25 });
-        pf.path(trail.map((p) => [p[0], p[1] + 5 * k]), { w: 0.6, col: PAL.g2, a: 0.7, passes: 1, gap: 0.3 });
-        c.restore();
-        // pedras
-        for (let i = 0; i < 6; i++) {
-          const rx = W * (0.08 + i * 0.16 + S() * 0.08), r = (5 + S() * 9) * k;
-          rock(pf, rx, bankY(rx) + 3 * k + S() * 6 * k, r);
-        }
-        // borda da margem e capim
-        pf.path(top, { w: 1.3, col: PAL.ink, a: 0.95, gap: 0.03, jit: 0.6 });
-        const grass = [];
-        for (let x = -4; x < W + 4; x += 2.2) {
-          if (S() < 0.55) {
-            const y = bankY(x) + 1, h = (2 + S() * 8) * k * (S() < 0.1 ? 1.8 : 1);
-            grass.push([x, y, x + (S() - 0.3) * 4 * k, y - h]);
-          }
-        }
-        pf.lines(grass, { w: 0.7, col: PAL.ink, a: 0.75, wob: 0.5 });
-        // abetos emoldurando a vista
+        const pf = new Pencil(fg.c, 88, seedJ + 5, k);
+        drawBank(pf, W, H, bankY, trailY);
         const tf = portrait ? 0.8 : 1;
         spruce(pf, W * 0.03, H * 1.02, H * 0.46 * tf, H * 0.15 * tf);
         spruce(pf, W * 0.84, H * 0.99, H * 0.25 * tf, H * 0.085 * tf);
         spruce(pf, W * 0.92, H * 1.03, H * 0.52 * tf, H * 0.17 * tf);
         spruce(pf, W * 0.99, H * 1.02, H * 0.4 * tf, H * 0.13 * tf);
         st.fg.push(fg);
-
-        st.count++;
-        return st.count < 3;
-      };
-      st.addVariant(); // a primeira já sai pronta; as outras são desenhadas quando o navegador folgar
+      });
 
       st.ground = trailY;
 
@@ -684,49 +871,11 @@
         const land = st.land[v] || st.land[0];
         const fg = st.fg[v] || st.fg[0];
         ctx.drawImage(sky.cv, 0, 0, W, H);
-
-        for (const cl of clouds) {
-          const span = W + cl.w * 2;
-          const x = ((cl.x0 + t * cl.v) % span + span) % span - cl.w;
-          ctx.drawImage(cl.L.cv, x, cl.y, cl.w, cl.h);
-        }
-
+        drawClouds(ctx, clouds, t, W);
         ctx.drawImage(land.cv, 0, 0, W, H);
         drawMist(ctx, mistHigh, t);
-
-        // reflexo: faixas espelhadas e deslocadas
-        ctx.globalAlpha = 0.36;
-        const lr = land.res, srcH = (2 / 0.72) * lr;
-        for (let y = 0; y < depth; y += 2) {
-          const sy = wY - (y + 2) / 0.72;
-          if (sy < 0) break;
-          const d = y / depth;
-          const off = (Math.sin(y * 0.13 - t * 1.4) * 0.9 + Math.sin(y * 0.047 + t * 0.6) * 1.6) * (0.35 + d * 1.8) * k;
-          ctx.drawImage(land.cv, 0, sy * lr, land.cv.width, srcH, off, wY + y, W, 2.2);
-        }
-        ctx.globalAlpha = 1;
-
-        // ondulações e brilhos
-        const alphas = [0.22, 0.36, 0.5];
-        ctx.lineCap = 'round';
-        for (let b = 0; b < 3; b++) {
-          ctx.beginPath();
-          for (const r of ripples) {
-            if (r.b !== b || r.glint) continue;
-            rippleTo(ctx, r, t, W, k);
-          }
-          ctx.strokeStyle = PAL.g1;
-          ctx.globalAlpha = alphas[b];
-          ctx.lineWidth = 0.9 * k;
-          ctx.stroke();
-        }
-        ctx.beginPath();
-        for (const r of ripples) if (r.glint) rippleTo(ctx, r, t, W, k);
-        ctx.strokeStyle = PAL.paper;
-        ctx.globalAlpha = 0.85;
-        ctx.lineWidth = 1.4 * k;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        reflect(ctx, land, wY, depth, t, k);
+        drawRipples(ctx, ripples, t, W, k);
 
         // cachoeiras correndo
         ctx.beginPath();
@@ -750,7 +899,7 @@
 
         // barco à deriva
         const span = W * 1.3;
-        const bx = W * 1.12 - (((t * 9 * k + W * 0.45) % span) + span) % span;
+        const bx = W * 1.12 - wrap(t * 9 * k + W * 0.45, span);
         const by = wY + depth * 0.3 + Math.sin(t * 1.3) * 1.2 * k;
         ctx.save();
         ctx.translate(bx, by + 2 * k);
@@ -765,47 +914,13 @@
         ctx.restore();
 
         drawMist(ctx, mistLow, t);
-
-        // pássaros
-        ctx.beginPath();
-        for (const b of birds) {
-          const span2 = W + 200;
-          const x = W + 100 - (((b.x0 + t * b.v) % span2) + span2) % span2;
-          const y = b.y + Math.sin(t * 0.5 + b.ph) * 6 * k;
-          const s = b.s, f = Math.sin(t * b.f + b.ph) * s * 0.5;
-          ctx.moveTo(x - s, y - f);
-          ctx.quadraticCurveTo(x - s * 0.45, y - s * 0.35 - f * 0.3, x, y);
-          ctx.quadraticCurveTo(x + s * 0.45, y - s * 0.35 - f * 0.3, x + s, y - f);
-        }
-        ctx.strokeStyle = PAL.ink;
-        ctx.globalAlpha = 0.8;
-        ctx.lineWidth = 1.1 * k;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-
+        drawBirds(ctx, birds, t, W, k);
         ctx.drawImage(fg.cv, 0, 0, W, H);
       };
 
       return st;
     },
   };
-
-  function drawMist(ctx, m, t) {
-    const w = m.L.w;
-    const x = -((((t * m.v) % w) + w) % w);
-    ctx.globalAlpha = m.a;
-    ctx.drawImage(m.L.cv, x, m.y, w, m.L.h);
-    ctx.drawImage(m.L.cv, x + w, m.y, w, m.L.h);
-    ctx.globalAlpha = 1;
-  }
-
-  function rippleTo(ctx, r, t, W, k) {
-    const span = W + 60;
-    const x = (((r.x + t * 2 * k + Math.sin(t * 0.35 + r.ph) * 6 * k * (0.4 + r.d)) % span) + span) % span - 30;
-    const L = r.len * (0.75 + 0.25 * Math.sin(t * 0.9 + r.ph * 2));
-    ctx.moveTo(x, r.y);
-    ctx.quadraticCurveTo(x + L / 2, r.y + 0.8 * k * Math.sin(r.ph + t), x + L, r.y);
-  }
 
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
   const SCENES = [Fjord];
@@ -902,7 +1017,7 @@
       x *= ratio;
     }
 
-    function update(dt, sceneT, ground, reduced) {
+    function update(dt, sceneT, ground, reduced, wind = 1) {
       t += dt;
       let target = 0;
       if (reduced) {
@@ -941,9 +1056,10 @@
       const nod = reduced ? 0 : Math.sin(t * 0.9) * 0.8 * (1 - a);
       P.head.setAttribute('transform', `rotate(${n2(-8 * look + nod)} 1.2 -64)`);
 
-      const w = reduced ? 0 : 1;
-      const f1 = Math.sin(t * 6.3) * 1.4 * w, f2 = Math.sin(t * 7.7 + 1) * 1.8 * w;
-      P.scarf.setAttribute('d', `M-3.2 -62.4 Q${n2(-8 - a * 2)} ${n2(-63.2 + f1 * 0.5)} ${n2(-11.5 - a * 2.5)} ${n2(-60.8 + f1)} T${n2(-16 - a * 3)} ${n2(-58.6 + f2)}`);
+      const w = reduced ? 0 : wind;
+      const fq = 0.75 + 0.25 * wind;
+      const f1 = Math.sin(t * 6.3 * fq) * 1.4 * w, f2 = Math.sin(t * 7.7 * fq + 1) * 1.8 * w;
+      P.scarf.setAttribute('d', `M-3.2 -62.4 Q${n2(-8 - a * 2)} ${n2(-63.2 + f1 * 0.5)} ${n2(-11.5 - a * 2.5 - w)} ${n2(-60.8 + f1)} T${n2(-16 - a * 3 - w * 2)} ${n2(-58.6 + f2)}`);
 
       const gy = ground(clamp(x, 0, 1e6));
       root.setAttribute('transform', `translate(${n2(x)} ${n2(gy)}) scale(${n2(s)})`);
@@ -1043,6 +1159,8 @@
     trans = { p: 0, dur: reduced ? 1.2 : 2.2 };
     /*<T>*/ if (Traveler) Traveler.reset(SCENES[idx], W, H, duration()); /*</T>*/
     updateLabel(!first);
+    // link direto para a paisagem (ex.: …/#saara). Não guarda nada, só atualiza o endereço.
+    try { history.replaceState(null, '', `#${SCENES[idx].id}`); } catch (e) { /* file:// em alguns navegadores */ }
     dirty = true;
   }
 
@@ -1110,7 +1228,7 @@
       drawTransition();
       if (trans.p >= 1) trans = null;
     }
-    /*<T>*/ if (Traveler) Traveler.update(run ? dt : 0, sceneT, state.ground, reduced); /*</T>*/
+    /*<T>*/ if (Traveler) Traveler.update(run ? dt : 0, sceneT, state.ground, reduced, state.wind || 1); /*</T>*/
   }
 
   // ---------- controles ----------
@@ -1188,8 +1306,16 @@
   })();
 
   // ---------- partida ----------
+  const fromHash = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const i = SCENES.findIndex((sc) => sc.id === id);
+    return i < 0 ? 0 : i;
+  };
+  window.addEventListener('hashchange', () => { const i = fromHash(); if (i !== idx) goTo(i); });
+
   measure();
   buildDots();
-  goTo(0, true);
+  idx = fromHash();
+  goTo(idx, true);
   requestAnimationFrame((t) => { last = t; frame(t); });
 })();
