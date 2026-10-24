@@ -251,3 +251,19 @@ body {
   .btn { transition: none; }
   .btn:hover { transform: none; }
 }
+
+/* ---------- Celular deitado / telas baixas ---------- */
+@media (max-height: 520px) and (min-width: 641px) {
+  /* a etiqueta sobe para o canto superior direito, longe da trilha do viajante */
+  .label {
+    top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
+    right: calc(var(--gutter) + env(safe-area-inset-right, 0px));
+    left: auto;
+    bottom: auto;
+    padding: 0.4rem 0.8rem 0.35rem 0.7rem;
+  }
+  .label-num { font-size: 1.3rem; }
+  .label-place { font-size: 0.98rem; }
+  .title { font-size: 1.8rem; }
+  .tagline { font-size: 0.9rem; }
+}
