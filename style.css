@@ -1,0 +1,227 @@
+/* Mirage — style.css
+   Papel, grafite e um pouco de fita adesiva. Paleta monocromática. */
+
+:root {
+  --paper: #F2EBDD;
+  --paper-2: #E6DCC8;
+  --ink: #2B2724;
+  --g1: #5A534C;
+  --g2: #8C847A;
+  --g3: #BDB4A6;
+
+  --serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --hand: "Kalam", "Segoe Print", "Bradley Hand", "Chalkboard SE", cursive;
+  --gutter: clamp(16px, 3vw, 40px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--hand);
+  font-weight: 300;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Palco ---------- */
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.scene, .traveler, .paper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scene { display: block; }
+
+.traveler { pointer-events: none; overflow: visible; }
+
+/* grão do papel (gerado em script.js) + vinheta de folha */
+.paper {
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background-repeat: repeat;
+  box-shadow:
+    inset 0 0 140px rgba(90, 83, 76, 0.24),
+    inset 0 0 22px rgba(90, 83, 76, 0.16);
+}
+
+/* ---------- Título ---------- */
+.masthead {
+  position: absolute;
+  top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
+  left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(1.9rem, 1.1rem + 2.4vw, 3rem);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.underline {
+  display: block;
+  width: clamp(92px, 10vw, 140px);
+  height: 10px;
+  margin-top: 3px;
+  fill: none;
+  stroke: var(--g1);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.tagline {
+  margin: 0.35rem 0 0;
+  font-size: clamp(0.92rem, 0.8rem + 0.35vw, 1.1rem);
+  color: var(--g1);
+}
+
+/* ---------- Rótulo da paisagem (etiqueta presa com fita) ---------- */
+.label {
+  position: absolute;
+  left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
+  bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem 0.5rem 0.85rem;
+  background: var(--paper);
+  border: 1px solid rgba(90, 83, 76, 0.28);
+  border-radius: 2px 4px 3px 2px;
+  box-shadow: 0 1px 0 rgba(43, 39, 36, 0.1), 0 8px 16px -10px rgba(43, 39, 36, 0.45);
+  transform: rotate(-1.2deg);
+}
+
+.label::before, .label::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  width: 44px;
+  height: 15px;
+  background: rgba(189, 180, 166, 0.6);
+}
+.label::before { left: 10px;  transform: rotate(-7deg); }
+.label::after  { right: 12px; transform: rotate(5deg); }
+
+.label-num {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.6rem;
+  line-height: 1;
+  min-width: 1.4ch;
+  text-align: center;
+}
+
+.label-text { display: flex; flex-direction: column; line-height: 1.2; }
+.label-place { font-size: 1.12rem; font-weight: 400; }
+.label-meta { font-size: 0.82rem; color: var(--g1); }
+
+.label.is-new { animation: label-in 0.9s ease both; }
+@keyframes label-in {
+  from { opacity: 0; transform: rotate(-1.2deg) translateY(8px); }
+}
+
+/* ---------- Controles ---------- */
+.controls {
+  position: absolute;
+  right: calc(var(--gutter) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn {
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: rgba(242, 235, 221, 0.86);
+  border: 1.5px solid var(--g1);
+  border-radius: 50% 46% 52% 48% / 48% 52% 46% 50%;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.btn svg {
+  width: 20px; height: 20px;
+  fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.btn:hover { transform: rotate(-4deg) scale(1.05); background: var(--paper); }
+.btn:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
+.btn .i-play { display: none; }
+.btn[aria-pressed="true"] .i-play { display: block; }
+.btn[aria-pressed="true"] .i-pause { display: none; }
+
+.dots {
+  list-style: none;
+  margin: 0 0 0 0.3rem;
+  padding: 0;
+  display: flex;
+}
+.dots button {
+  width: 22px; height: 44px;
+  padding: 0;
+  background: none; border: 0;
+  cursor: pointer;
+  display: grid; place-items: center;
+}
+.dots button::before {
+  content: "";
+  width: 8px; height: 8px;
+  border: 1.3px solid var(--g1);
+  border-radius: 50% 45% 55% 50%;
+}
+.dots button[aria-current="true"]::before { background: var(--ink); border-color: var(--ink); }
+.dots button:focus-visible { outline: 2px dashed var(--ink); outline-offset: -6px; }
+
+.noscript {
+  position: fixed; inset: auto 0 40% 0;
+  text-align: center; font-size: 1.2rem; color: var(--g1);
+}
+
+/* ---------- Celular ---------- */
+@media (max-width: 640px) {
+  .controls {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    gap: 0.25rem;
+  }
+  .dots button { width: 17px; }
+  /* no celular a etiqueta sobe para baixo do título, longe da trilha do viajante */
+  .label {
+    top: calc(var(--gutter) + 5.6rem + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    padding: 0.45rem 0.8rem 0.4rem 0.7rem;
+  }
+  .label-num { font-size: 1.35rem; }
+  .label-place { font-size: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .label.is-new { animation: none; }
+  .btn { transition: none; }
+  .btn:hover { transform: none; }
+}

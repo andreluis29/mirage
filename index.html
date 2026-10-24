@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Segurança: só scripts e estilos do próprio site; fontes do Google; nenhuma conexão externa. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F2EBDD">
+  <title>Mirage — um caderno de paisagens</title>
+  <meta name="description" content="Mirage: paisagens do mundo desenhadas à mão, a lápis, atravessadas por um viajante.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Kalam:wght@300;400&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main class="stage" id="stage">
+    <!-- Paisagem: desenhada em canvas -->
+    <canvas id="scene" class="scene" aria-hidden="true"></canvas>
+
+    <!-- textura de papel e vinheta -->
+    <div class="paper" aria-hidden="true"></div>
+
+    <header class="masthead">
+      <h1 class="title">Mirage</h1>
+      <svg class="underline" viewBox="0 0 120 10" aria-hidden="true" focusable="false"><path d="M2 6 C 28 2, 62 9, 118 3.5"/></svg>
+      <p class="tagline">um caderno de paisagens do mundo</p>
+    </header>
+
+    <p class="label" id="label" aria-live="polite">
+      <span class="label-num" id="label-num">I</span>
+      <span class="label-text">
+        <span class="label-place" id="label-place">Geirangerfjord</span>
+        <span class="label-meta" id="label-meta">Noruega · 62°06′N 7°06′E</span>
+      </span>
+    </p>
+
+    <nav class="controls" aria-label="Navegação entre paisagens">
+      <button class="btn" id="btn-prev" type="button" aria-label="Paisagem anterior">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5.5 C11 8.5 9.5 10.5 8.6 12.1 C9.8 13.8 11.6 15.8 14.8 18.6"/></svg>
+      </button>
+      <button class="btn" id="btn-play" type="button" aria-label="Pausar" aria-pressed="false">
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.2 6.4 C9 10 9.3 14 9 17.6 M15 6.2 C15.2 10 14.8 14 15.1 17.8"/></svg>
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8.6 6 C8.4 10 8.7 14 8.5 18.2 C12 16 15 14 17.6 12.1 C14.6 10 11.6 8 8.6 6 Z"/></svg>
+      </button>
+      <button class="btn" id="btn-next" type="button" aria-label="Próxima paisagem">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5.5 C13 8.5 14.5 10.5 15.4 12.1 C14.2 13.8 12.4 15.8 9.2 18.6"/></svg>
+      </button>
+      <ol class="dots" id="dots"></ol>
+    </nav>
+  </main>
+
+  <noscript><p class="noscript">Mirage precisa de JavaScript para desenhar as paisagens.</p></noscript>
+</body>
+</html>
