@@ -810,6 +810,154 @@
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
   const SCENES = [Fjord];
 
+  /*<T>*/
+  /* ================================================================
+   * 4. Viajante (SVG)
+   *    Unidade: 1 cabeça = 10. Altura total 75 (+ chapéu). Pés em y = 0.
+   *    Pernas e braços são recalculados a cada quadro (cinemática simples).
+   * ================================================================ */
+  const Traveler = (() => {
+    const q = (id) => document.getElementById(id);
+    const root = q('tv');
+    if (!root) return null;
+    const P = {
+      legBo: q('tv-legB-o'), legBi: q('tv-legB-i'), bootB: q('tv-bootB'),
+      legFo: q('tv-legF-o'), legFi: q('tv-legF-i'), bootF: q('tv-bootF'),
+      armBo: q('tv-armB-o'), armBi: q('tv-armB-i'), handB: q('tv-handB'),
+      armFo: q('tv-armF-o'), armFi: q('tv-armF-i'), handF: q('tv-handF'),
+      upper: q('tv-upper'), upperB: q('tv-upper-back'), head: q('tv-head'),
+      scarf: q('tv-scarf'), noise: q('tv-noise'),
+    };
+    const HIP = -37, THIGH = 18, SHIN = 17.5, FOOT = 5.4, UARM = 12.6, FARM = 11.8;
+    const SH = [0.6, -59.6];        // ombro
+    const STRIDE = 60;              // avanço (unidades) por ciclo completo de passos
+    const FIG_H = 80;               // altura com chapéu
+    const CYCLE = 1.1;              // segundos por ciclo no passo natural
+
+    let s = 1, x = -999, v = 60, speed = 0, phase = 0, t = 0, boil = 0, seed = 3, look = 0;
+    let mode = 'wait', hold = 0;
+    let plan = { delay: 1.6, startX: -50, stopX: 300, endX: 1200, pause: 4 };
+
+    const n2 = (n) => (Math.round(n * 100) / 100).toString();
+
+    function leg(phi, a, stand) {
+      const th = a * 0.44 * Math.sin(phi) + (1 - a) * stand;                                   // coxa (+ = para frente)
+      const kn = 0.06 + a * 0.95 * Math.pow(Math.max(0, Math.cos(phi)), 1.7); // joelho dobra no balanço
+      const kx = Math.sin(th) * THIGH, ky = Math.cos(th) * THIGH;
+      const sh = th - kn;
+      const ax = kx + Math.sin(sh) * SHIN, ay = ky + Math.cos(sh) * SHIN;
+      const fa = -0.22 * a * Math.max(0, Math.cos(phi)) + 0.38 * a * Math.max(0, -Math.sin(phi)) ** 3;
+      const toe = [ax + Math.cos(fa) * FOOT, ay + Math.sin(fa) * FOOT];
+      const heel = [ax - Math.cos(fa) * 1.4, ay - Math.sin(fa) * 1.4];
+      return { kx, ky, ax, ay, toe, heel, low: Math.max(ay + 1.6, toe[1] + 0.9) };
+    }
+
+    function arm(phi, a) {
+      const ang = -a * 0.42 * Math.sin(phi) + 0.06;
+      const el = 0.2 + a * 0.32 * Math.max(0, -Math.sin(phi));
+      const ex = SH[0] + Math.sin(ang) * UARM, ey = SH[1] + Math.cos(ang) * UARM;
+      const a2 = ang + el;
+      return { ex, ey, wx: ex + Math.sin(a2) * FARM, wy: ey + Math.cos(a2) * FARM };
+    }
+
+    function setLeg(o, i, boot, L, hy) {
+      const d = `M0 ${n2(hy)} L${n2(L.kx)} ${n2(hy + L.ky)} L${n2(L.ax)} ${n2(hy + L.ay)}`;
+      o.setAttribute('d', d);
+      i.setAttribute('d', d);
+      boot.setAttribute('d', `M${n2(L.heel[0])} ${n2(hy + L.heel[1])} L${n2(L.toe[0])} ${n2(hy + L.toe[1])}`);
+    }
+
+    function setArm(o, i, hand, A) {
+      const d = `M${SH[0]} ${SH[1]} L${n2(A.ex)} ${n2(A.ey)} L${n2(A.wx)} ${n2(A.wy)}`;
+      o.setAttribute('d', d);
+      i.setAttribute('d', d);
+      hand.setAttribute('cx', n2(A.wx));
+      hand.setAttribute('cy', n2(A.wy + 0.6));
+    }
+
+    /** Planeja a travessia para caber na duração da cena (entra, para e contempla, sai). */
+    function setup(scene, W, H, D) {
+      s = clamp(H * 0.125, 64, 170) / FIG_H;
+      const stopU = H > W * 1.1 ? 0.5 : scene.stopAt;
+      const startX = -18 * s, endX = W + 18 * s, stopX = W * stopU, delay = 1.6;
+      v = (STRIDE * s) / CYCLE;
+      const overhead = 1.6 + 1.0; // aceleração/frenagem + folga de saída
+      let pause = D - delay - (endX - startX) / v - overhead;
+      if (pause < 2.5) { pause = 2.5; v = (endX - startX) / (D - delay - overhead - pause); }
+      plan = { delay, startX, stopX, endX, pause };
+    }
+
+    function reset(scene, W, H, D) {
+      setup(scene, W, H, D);
+      x = plan.startX;
+      speed = 0;
+      phase = 0;
+      look = 0;
+      mode = 'wait';
+    }
+
+    function resize(scene, W, H, D, oldW) {
+      const ratio = oldW ? W / oldW : 1;
+      setup(scene, W, H, D);
+      x *= ratio;
+    }
+
+    function update(dt, sceneT, ground, reduced) {
+      t += dt;
+      let target = 0;
+      if (reduced) {
+        x = plan.stopX; speed = 0; mode = 'rest'; hold = Infinity;
+      } else {
+        switch (mode) {
+          case 'wait': if (sceneT >= plan.delay) mode = 'walk1'; break;
+          case 'walk1':
+            target = v;
+            if (plan.stopX - x <= speed / 2.8 + 0.5) { mode = 'rest'; hold = plan.pause; }
+            break;
+          case 'rest': hold -= dt; if (hold <= 0) mode = 'walk2'; break;
+          case 'walk2': target = v; break;
+          default: break;
+        }
+        speed += (target - speed) * Math.min(1, dt * 2.8);
+        if (mode === 'wait') speed = 0;
+        x += speed * dt;
+        phase += (TAU * speed / (STRIDE * s)) * dt;
+      }
+      const a = clamp(speed / v, 0, 1);
+      look += ((mode === 'rest' ? 1 : 0) - look) * Math.min(1, dt * 1.5);
+
+      const LF = leg(phase, a, 0.09), LB = leg(phase + Math.PI, a, -0.07);
+      const hy = -Math.max(LF.low, LB.low);
+      const breathe = reduced ? 0 : (1 - a) * Math.sin(t * 1.7) * 0.3;
+      const dy = hy - HIP + breathe;
+      setLeg(P.legBo, P.legBi, P.bootB, LB, hy);
+      setLeg(P.legFo, P.legFi, P.bootF, LF, hy);
+      const lean = a * 4;
+      const tr = `translate(0 ${n2(dy)}) rotate(${n2(lean)} 0 ${HIP})`;
+      P.upper.setAttribute('transform', tr);
+      P.upperB.setAttribute('transform', tr);
+      setArm(P.armFo, P.armFi, P.handF, arm(phase, a));
+      setArm(P.armBo, P.armBi, P.handB, arm(phase + Math.PI, a));
+      const nod = reduced ? 0 : Math.sin(t * 0.9) * 0.8 * (1 - a);
+      P.head.setAttribute('transform', `rotate(${n2(-8 * look + nod)} 1.2 -64)`);
+
+      const w = reduced ? 0 : 1;
+      const f1 = Math.sin(t * 6.3) * 1.4 * w, f2 = Math.sin(t * 7.7 + 1) * 1.8 * w;
+      P.scarf.setAttribute('d', `M-3.2 -62.4 Q${n2(-8 - a * 2)} ${n2(-63.2 + f1 * 0.5)} ${n2(-11.5 - a * 2.5)} ${n2(-60.8 + f1)} T${n2(-16 - a * 3)} ${n2(-58.6 + f2)}`);
+
+      const gy = ground(clamp(x, 0, 1e6));
+      root.setAttribute('transform', `translate(${n2(x)} ${n2(gy)}) scale(${n2(s)})`);
+
+      if (!reduced && dt > 0) {
+        boil += dt;
+        if (boil > 0.2) { boil = 0; seed = (seed % 6) + 1; P.noise.setAttribute('seed', String(seed)); }
+      }
+    }
+
+    return { reset, resize, update };
+  })();
+  /*</T>*/
+
   /* ================================================================
    * 5. Motor
    * ================================================================ */
@@ -893,6 +1041,7 @@
     sceneT = 0;
     animT = 0;
     trans = { p: 0, dur: reduced ? 1.2 : 2.2 };
+    /*<T>*/ if (Traveler) Traveler.reset(SCENES[idx], W, H, duration()); /*</T>*/
     updateLabel(!first);
     dirty = true;
   }
@@ -961,6 +1110,7 @@
       drawTransition();
       if (trans.p >= 1) trans = null;
     }
+    /*<T>*/ if (Traveler) Traveler.update(run ? dt : 0, sceneT, state.ground, reduced); /*</T>*/
   }
 
   // ---------- controles ----------
@@ -1009,6 +1159,7 @@
       measure();
       build();
       trans = null;
+      /*<T>*/ if (Traveler) Traveler.resize(SCENES[idx], W, H, duration(), oldW); /*</T>*/
       dirty = true;
     }, 160);
   });

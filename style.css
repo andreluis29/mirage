@@ -59,6 +59,30 @@ body {
     inset 0 0 22px rgba(90, 83, 76, 0.16);
 }
 
+/* ---------- O viajante ---------- */
+.tv-shadow   { fill: var(--ink); opacity: 0.16; }
+.tv-leg-o    { fill: none; stroke: var(--ink); stroke-width: 5.2; stroke-linecap: round; stroke-linejoin: round; }
+.tv-leg-front{ fill: none; stroke: var(--g1); stroke-width: 3.3; stroke-linecap: round; stroke-linejoin: round; }
+.tv-leg-back { fill: none; stroke: #423C37; stroke-width: 3.3; stroke-linecap: round; stroke-linejoin: round; }
+.tv-boot     { fill: none; stroke: var(--ink); stroke-width: 4.4; stroke-linecap: round; }
+.tv-arm-o    { fill: none; stroke: var(--ink); stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; }
+.tv-arm-front{ fill: none; stroke: var(--g2); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.tv-arm-back { fill: none; stroke: var(--g1); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.tv-hand     { fill: var(--paper); stroke: var(--ink); stroke-width: 0.7; }
+.tv-coat     { fill: url(#tv-hatch); stroke: var(--ink); stroke-width: 0.95; stroke-linejoin: round; }
+.tv-pack     { fill: url(#tv-hatch-dark); stroke: var(--ink); stroke-width: 0.9; stroke-linejoin: round; }
+.tv-roll     { fill: var(--paper-2); stroke: var(--ink); stroke-width: 0.8; }
+.tv-skin     { fill: var(--paper); stroke: var(--ink); stroke-width: 0.85; }
+.tv-eye      { fill: var(--ink); }
+.tv-hair     { fill: none; stroke: var(--g1); stroke-width: 1.4; stroke-linecap: round; }
+.tv-hat      { fill: var(--g1); stroke: var(--ink); stroke-width: 0.9; }
+.tv-band     { fill: none; stroke: var(--ink); stroke-width: 1.1; }
+.tv-brim     { fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; }
+.tv-strap    { fill: none; stroke: var(--ink); stroke-width: 1; stroke-linecap: round; }
+.tv-scarf    { fill: none; stroke: var(--g1); stroke-width: 2.4; stroke-linecap: round; }
+.tv-line     { fill: none; stroke: var(--ink); stroke-width: 0.8; stroke-linecap: round; stroke-linejoin: round; }
+.tv-line.thin{ stroke-width: 0.5; }
+
 /* ---------- Título ---------- */
 .masthead {
   position: absolute;
