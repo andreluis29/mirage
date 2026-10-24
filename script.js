@@ -922,8 +922,286 @@
     },
   };
 
+  /* ---------- Cena II · Monte Fuji (Lago Kawaguchi, Japão) ---------- */
+
+  /** Cerejeira: galhos recursivos em tinta escura e cachos de flores miúdas. */
+  function cherryTree(pen, x0, y0, sc, ang0) {
+    const c = pen.c, S = pen.S, J = pen.J, segs = [], clusters = [];
+    const grow = (x, y, ang, len, w, depth) => {
+      let px = x, py = y, a = ang;
+      for (let i = 0; i < 4; i++) {
+        a += (S() - 0.5) * 0.35;
+        const nx = px + (Math.cos(a) * len) / 4, ny = py + (Math.sin(a) * len) / 4;
+        segs.push([px, py, nx, ny, w * (1 - i * 0.08)]);
+        px = nx; py = ny;
+      }
+      if (depth <= 0) { clusters.push([px, py, (16 + S() * 16) * sc]); return; }
+      const n = 2 + (S() < 0.4 ? 1 : 0);
+      for (let j = 0; j < n; j++) {
+        grow(px, py, a + (j - (n - 1) / 2) * 0.62 + (S() - 0.5) * 0.3, len * (0.62 + S() * 0.16), w * 0.64, depth - 1);
+      }
+      if (depth < 3 && S() < 0.6) clusters.push([px, py, (12 + S() * 12) * sc]);
+    };
+    grow(x0, y0, ang0, 170 * sc, 18 * sc, 5);
+
+    c.lineCap = 'round';
+    c.strokeStyle = PAL.ink;
+    c.globalAlpha = 0.92;
+    for (const [x1, y1, x2, y2, w] of segs) {
+      c.lineWidth = Math.max(0.8, w);
+      c.beginPath();
+      c.moveTo(x1 + (J() - 0.5), y1);
+      c.lineTo(x2 + (J() - 0.5), y2);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+    const light = [];
+    for (const [x1, y1, x2, y2, w] of segs) if (w > 4) light.push([x1 - w * 0.25, y1, x2 - w * 0.25, y2]);
+    pen.lines(light, { w: 0.8, col: PAL.g3, a: 0.7 });
+
+    const fl = [];
+    for (const [cx, cy, r] of clusters) {
+      const n = Math.round((r * r) / (14 * sc * sc)) + 5;
+      for (let i = 0; i < n; i++) {
+        const a = S() * TAU, d = Math.sqrt(S()) * r;
+        fl.push([cx + Math.cos(a) * d * 1.25, cy + Math.sin(a) * d * 0.8, (2 + S() * 2) * sc]);
+      }
+    }
+    c.beginPath();
+    for (const [x, y, r] of fl) { c.moveTo(x + r, y); c.arc(x, y, r, 0, TAU); }
+    c.fillStyle = PAL.paper;
+    c.fill();
+    c.strokeStyle = PAL.g1;
+    c.lineWidth = 0.6 * pen.k;
+    c.globalAlpha = 0.6;
+    c.stroke();
+    c.globalAlpha = 1;
+    const sh = [], dots = [];
+    for (const [x, y, r] of fl) {
+      if (S() < 0.25) sh.push([x - r, y + r * 0.6, x + r * 0.3, y + r * 1.4]);
+      if (S() < 0.3) dots.push([x, y, x + 0.4, y + 0.4]);
+    }
+    pen.lines(sh, { w: 0.6, col: PAL.g2, a: 0.6 });
+    pen.lines(dots, { w: 1, col: PAL.g1, a: 0.7, wob: 0 });
+  }
+
+  /** Pagode de cinco andares (Chureito), telhados com pontas viradas. */
+  function pagoda(pen, x, baseY, h) {
+    const c = pen.c, th = h * 0.16, w0 = h * 0.5;
+    let y = baseY;
+    pen.lines([[x - w0 * 0.32, y, x + w0 * 0.32, y]], { w: 1.2, col: PAL.ink });
+    for (let i = 0; i < 5; i++) {
+      const f = 1 - i * 0.12, bw = w0 * 0.42 * f, rw = w0 * f;
+      const by = y - th * 0.55;
+      c.fillStyle = PAL.paper;
+      c.fillRect(x - bw / 2, by, bw, y - by);
+      pen.lines([[x - bw / 2, y, x - bw / 2, by], [x + bw / 2, y, x + bw / 2, by], [x - bw / 6, y, x - bw / 6, by], [x + bw / 6, y, x + bw / 6, by]], { w: 0.7, col: PAL.ink, a: 0.85, wob: 0.3 });
+      const rh = th * 0.5, roof = [
+        [x - rw / 2, by - rh * 0.55], [x - rw * 0.32, by - rh * 0.05], [x - bw * 0.5, by + 1],
+        [x + bw * 0.5, by + 1], [x + rw * 0.32, by - rh * 0.05], [x + rw / 2, by - rh * 0.55],
+        [x + rw * 0.17, by - rh], [x - rw * 0.17, by - rh],
+      ];
+      const p = new Path2D();
+      roof.forEach((q, j) => (j ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+      p.closePath();
+      c.fillStyle = PAL.g1;
+      c.fill(p);
+      pen.path([...roof, roof[0]], { w: 0.8, col: PAL.ink, passes: 1, jit: 0.2 });
+      y = by - rh * 0.85;
+    }
+    const top = y - h * 0.24, rings = [];
+    for (let i = 1; i < 8; i++) { const yy = y - (h * 0.22 * i) / 8; rings.push([x - 1.6 * pen.k, yy, x + 1.6 * pen.k, yy]); }
+    pen.lines([[x, y, x, top], ...rings], { w: 0.8, col: PAL.ink, wob: 0.2 });
+  }
+
+  /** Lanterna de pedra (tōrō). */
+  function stoneLantern(pen, x, baseY, h) {
+    const c = pen.c;
+    const parts = [ // [altura, largura] de baixo para cima (frações de h)
+      [0.1, 0.42], [0.34, 0.13], [0.07, 0.36], [0.19, 0.25], [0.13, 0.52], [0.07, 0.1],
+    ];
+    let y = baseY;
+    parts.forEach(([ph, pw], i) => {
+      const hh = ph * h, ww = pw * h, top = y - hh;
+      let pts;
+      if (i === 4) pts = [[x - ww / 2, y - hh * 0.25], [x - ww * 0.1, top], [x + ww * 0.1, top], [x + ww / 2, y - hh * 0.25], [x + ww * 0.42, y], [x - ww * 0.42, y]];
+      else if (i === 5) pts = Array.from({ length: 13 }, (_, j) => { const a = (j / 12) * TAU; return [x + Math.cos(a) * ww / 2, top + hh / 2 + Math.sin(a) * hh / 2]; });
+      else pts = [[x - ww / 2, y], [x - ww / 2, top], [x + ww / 2, top], [x + ww / 2, y]];
+      const p = new Path2D();
+      pts.forEach((q, j) => (j ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
+      p.closePath();
+      c.fillStyle = PAL.paper;
+      c.fill(p);
+      c.save();
+      c.clip(p);
+      const hs = [];
+      for (let xx = x; xx < x + ww; xx += 1.8 * pen.k) hs.push([xx, y, xx - hh * 0.3, top]);
+      pen.lines(hs, { w: 0.55, col: PAL.g1, a: 0.6 });
+      if (i === 3) { c.fillStyle = PAL.ink; c.fillRect(x - ww * 0.22, top + hh * 0.25, ww * 0.44, hh * 0.45); }
+      c.restore();
+      pen.path([...pts, pts[0]], { w: 0.9, col: PAL.ink, passes: 2, jit: 0.3 });
+      y = top;
+    });
+  }
+
+  const Fuji = {
+    id: 'fuji',
+    numeral: 'II',
+    place: 'Monte Fuji',
+    meta: 'Japão · 35°21′N 138°43′E',
+    mood: 'delicada, serena',
+    duration: 28,
+    stopAt: 0.5,
+    stopAtPortrait: 0.36,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hf = portrait ? 0.82 : 1;
+      const wY = H * (portrait ? 0.6 : 0.62), bottomWater = H * 0.87, depth = bottomWater - wY;
+      const nF = noise1(rng(1101)), nS = noise1(rng(1102)), nH = noise1(rng(1103)), nB = noise1(rng(1104));
+
+      const cx = W * (portrait ? 0.5 : 0.44);
+      const R = Math.max(W * 0.48, H * 0.5) * (portrait ? 1.15 : 1);
+      const Hpk = H * 0.4 * hf;
+      const fujiY = (x) => {
+        const d = Math.abs(x - cx) / R, dd = Math.max(0, d - 0.035);
+        if (dd >= 1) return wY + 2;
+        const crater = d < 0.035 ? H * 0.003 * Math.sin(x * 0.35) : 0;
+        return wY - Hpk * Math.pow(1 - dd, 1.9) + H * 0.004 * fbm(nF, x * 0.05) + crater;
+      };
+      // linha de neve em altura absoluta, com "dedos" de neve descendo pelas ravinas
+      const snowY = (x) => Math.max(fujiY(x) + 2, wY - Hpk * (0.66 + 0.03 * nS(x * 0.02)) + Hpk * 0.16 * Math.pow(Math.max(0, nS(x * 0.07 + 3)), 2));
+      const hills = (x) => {
+        const u = x / W;
+        return wY - H * hf * (0.035 + 0.06 * bell(u, 0.12, 0.13) + 0.035 * bell(u, 0.86, 0.14) + 0.012 * fbm(nH, u * 30));
+      };
+      const bankY = (x) => H * (portrait ? 0.85 : 0.84) + H * 0.01 * Math.sin((x / W) * 3.1 + 1.2) + H * 0.006 * fbm(nB, x * 0.01);
+      const trailY = (x) => bankY(x) + H * 0.036;
+      const fujiPts = sample(-6, W + 6, 3, fujiY);
+      const hillPts = sample(-6, W + 6, 3, hills);
+      const pagX = W * (portrait ? 0.16 : 0.15);
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 1150, 1151, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.01, H * 0.28, 0.4);
+        sunDisc(pen, W * (portrait ? 0.78 : 0.74), H * 0.16, Math.min(W, H) * 0.035, 1);
+        waterStrokes(pen, W, wY, bottomWater);
+      }
+
+      const clouds = makeClouds(1160, 2, W, H, k, res, { y0: 0.05, dy: 0.06, size: Math.min(W * 0.22, H * 0.4), speed: 3 });
+      const band = { L: mistSprite(1170, Math.ceil(W * 1.5), Math.ceil(H * 0.07), 55), y: wY - Hpk * 0.62, v: 6 * k, a: 0.95 };
+      const mistLow = { L: mistSprite(1171, Math.ceil(W * 1.5), Math.ceil(H * 0.08)), y: wY - H * 0.05, v: -5 * k, a: 0.7 };
+      const ripples = makeRipples(1180, 200, W, wY, depth, k);
+      const birds = makeBirds(1190, 3, W, H, 0.14, 0.3, k);
+      const petals = makeParticles(1199, portrait ? 45 : 70);
+
+      const st = { W, H, wY, land: [], fg: [], wind: 0.7 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res), c = land.c;
+        const pen = new Pencil(c, 1200, seedJ, k), S = pen.S;
+
+        // o cone: neve no alto, rocha hachurada embaixo, floresta na base
+        const poly = new Path2D();
+        poly.moveTo(-6, wY + 2);
+        fujiPts.forEach((p) => poly.lineTo(p[0], p[1]));
+        poly.lineTo(W + 6, wY + 2);
+        poly.closePath();
+        c.fillStyle = '#ECE5D7';
+        c.fill(poly);
+        c.save();
+        c.clip(poly);
+        const fall = [], hatch = [], gul = [], snowSh = [], ticks = [];
+        for (let i = 1; i < fujiPts.length - 1; i++) {
+          const [x, y] = fujiPts[i];
+          if (y >= wY - 2) continue;
+          const sy = Math.min(snowY(x), wY), slope = (fujiPts[i + 1][1] - fujiPts[i - 1][1]) / 6;
+          const shadow = x > cx, s = shadow ? 0.62 + 0.2 * nF(x * 0.02) : 0.25 + 0.15 * nF(x * 0.02);
+          if (sy < wY - 4 && S() < 0.75) {
+            const L = (wY - sy) * (0.12 + S() * 0.5), ang = Math.PI / 2 - Math.atan(slope) * 0.85 + (S() - 0.5) * 0.15;
+            fall.push([x, sy + S() * 3, x + Math.cos(ang) * L, sy + Math.sin(ang) * L]);
+          }
+          if (shadow && S() < s) {
+            const L = (wY - sy) * (0.2 + S() * 0.6);
+            hatch.push([x, sy + 2, x - L * 0.4, sy + 2 + L]);
+          }
+          if (S() < 0.16) {
+            const L = (sy - y) * (0.3 + S() * 0.6);
+            gul.push([x, y + 2, x + (shadow ? 1 : -1) * L * 0.12, y + 2 + L]);
+          }
+          if (shadow && S() < 0.45) snowSh.push([x, y + 3, x - (sy - y) * 0.25, sy - 2]);
+          if (S() < 0.9) { const yy = wY - S() * Hpk * 0.13, hh = (2 + S() * 4) * k; ticks.push([x, yy, x, yy - hh]); }
+        }
+        pen.lines(snowSh, { w: 0.6, col: PAL.g3, a: 0.55 });
+        pen.lines(gul, { w: 0.6, col: PAL.g2, a: 0.6 });
+        pen.lines(fall, { w: 0.7, col: PAL.g1, a: 0.5 });
+        pen.lines(hatch, { w: 0.7, col: PAL.g1, a: 0.5 });
+        pen.lines(ticks, { w: 0.8, col: PAL.g1, a: 0.6, wob: 0.3 });
+        c.restore();
+        const snowLine = fujiPts.filter((p) => snowY(p[0]) > p[1] + 3).map((p) => [p[0], snowY(p[0])]);
+        pen.path(snowLine, { w: 0.7, col: PAL.g2, a: 0.8, passes: 1, gap: 0.12 });
+        pen.path(fujiPts.filter((p) => p[1] < wY), { w: 1.1, col: PAL.g1, a: 0.95, gap: 0.02 });
+
+        // colinas com floresta e o pagode
+        drawRange(pen, {
+          pts: hillPts, base: wY + 1, fill: '#E6DDCD', hatchCol: PAL.g1, hatchA: 0.5, fallA: 0.45,
+          fallEvery: 2, fallDensity: 0.7, hatchEvery: 1, hatchFrom: 0.5, crossFrom: 0.8,
+          bandH: H * 0.02, bandA: 0.4, forest: 0.85, lineW: 1.1, lineCol: PAL.g1, lineA: 0.95,
+          shade: (x, y, sl) => 0.45 + 0.3 * Math.tanh(sl * 2) + 0.3 * nH(x * 0.02),
+        });
+        pagoda(pen, pagX, hills(pagX) + 2 * k, H * 0.13 * hf);
+        pen.path(sample(-4, W + 4, 6, () => wY), { w: 0.9, col: PAL.g1, a: 0.8, gap: 0.08, jit: 0.5 });
+        st.land.push(land);
+
+        const fg = makeLayer(W, H, res);
+        const pf = new Pencil(fg.c, 1300, seedJ + 5, k);
+        drawBank(pf, W, H, bankY, trailY, { rocks: 4 });
+        stoneLantern(pf, W * (portrait ? 0.2 : 0.24), bankY(W * 0.24) + 6 * k, H * 0.14);
+        const sc = portrait ? H / 1400 : H / 820;
+        cherryTree(pf, W * (portrait ? 1.04 : 0.97), H * 1.02, sc, -Math.PI / 2 - (portrait ? 0.45 : 0.32));
+        st.fg.push(fg);
+      });
+
+      st.ground = trailY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        drawClouds(ctx, clouds, t, W);
+        ctx.drawImage(land.cv, 0, 0, W, H);
+        drawMist(ctx, band, t);
+        reflect(ctx, land, wY, depth, t, k, { alpha: 0.4, amp: 0.8 });
+        drawRipples(ctx, ripples, t, W, k, { speed: 0.8 });
+        drawMist(ctx, mistLow, t);
+        drawBirds(ctx, birds, t, W, k, 1);
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+
+        // pétalas soltas no vento
+        ctx.beginPath();
+        for (const p of petals) {
+          const x = wrap(p.x * W * 1.3 - t * (14 + 20 * p.v) * k + Math.sin(t * 0.8 + p.ph) * 25 * k, W + 60) - 30;
+          const y = wrap(p.y * H + t * (12 + 14 * p.v) * k, H + 40) - 20;
+          const s = 2.6 * p.s * k, rot = t * 1.5 * p.v + p.ph;
+          ctx.moveTo(x + Math.cos(rot) * s, y + Math.sin(rot) * s);
+          ctx.ellipse(x, y, s, s * 0.55, rot, 0, TAU);
+        }
+        ctx.fillStyle = PAL.paper;
+        ctx.globalAlpha = 0.95;
+        ctx.fill();
+        ctx.strokeStyle = PAL.g1;
+        ctx.lineWidth = 0.6 * k;
+        ctx.globalAlpha = 0.8;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord];
+  const SCENES = [Fjord, Fuji];
 
   /*<T>*/
   /* ================================================================
@@ -993,7 +1271,7 @@
     /** Planeja a travessia para caber na duração da cena (entra, para e contempla, sai). */
     function setup(scene, W, H, D) {
       s = clamp(H * 0.125, 64, 170) / FIG_H;
-      const stopU = H > W * 1.1 ? 0.5 : scene.stopAt;
+      const stopU = H > W * 1.1 ? (scene.stopAtPortrait || 0.5) : scene.stopAt;
       const startX = -18 * s, endX = W + 18 * s, stopX = W * stopU, delay = 1.6;
       v = (STRIDE * s) / CYCLE;
       const overhead = 1.6 + 1.0; // aceleração/frenagem + folga de saída
