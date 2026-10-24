@@ -180,7 +180,7 @@
         if (!(snow && s < 0.6)) fall.push([x, y0, x + Math.cos(ang) * L, y0 + Math.sin(ang) * L]);
       }
       if (i % o.hatchEvery === 0 && s > o.hatchFrom) {
-        const L = depth * (0.15 + S() * 0.6) * s;
+        const L = Math.min(depth * (0.15 + S() * 0.6) * s, o.maxHatch || 1e9);
         const y0 = y + 1 + S() * 4;
         if (!(snow && s < 0.75)) {
           hatch.push([x, y0, x - L * 0.45, y0 + L]);
@@ -2047,8 +2047,230 @@
     },
   };
 
+  /* ---------- Cena VI · Himalaia (Ama Dablam, Nepal) ---------- */
+
+  /** Estupa (chorten): degraus, cúpula, olhos do Buda e pináculo de 13 anéis. */
+  function stupa(pen, x, baseY, h) {
+    const c = pen.c, k = pen.k;
+    const box = (cx, y0, w, hh) => {
+      const pts = [[cx - w / 2, y0], [cx - w / 2, y0 - hh], [cx + w / 2, y0 - hh], [cx + w / 2, y0]];
+      c.fillStyle = PAL.paper;
+      c.fillRect(cx - w / 2, y0 - hh, w, hh);
+      const hs = [];
+      for (let xx = cx + w * 0.15; xx < cx + w / 2; xx += 1.8 * k) hs.push([xx, y0, xx, y0 - hh]);
+      pen.lines(hs, { w: 0.5, col: PAL.g1, a: 0.5 });
+      pen.path([...pts, pts[0]], { w: 0.9, col: PAL.ink, passes: 1, jit: 0.2 });
+    };
+    let y = baseY;
+    for (const f of [0.95, 0.8, 0.66]) { box(x, y, h * f, h * 0.08); y -= h * 0.08; }
+    // cúpula
+    const dome = [];
+    for (let a = Math.PI; a <= TAU + 0.01; a += 0.1) dome.push([x + Math.cos(a) * h * 0.3, y + Math.sin(a) * h * 0.26]);
+    const dp = new Path2D();
+    dome.forEach((q, i) => (i ? dp.lineTo(q[0], q[1]) : dp.moveTo(q[0], q[1])));
+    dp.closePath();
+    c.fillStyle = PAL.paper;
+    c.fill(dp);
+    c.save();
+    c.clip(dp);
+    const hs = [];
+    for (let xx = x; xx < x + h * 0.32; xx += 1.8 * k) hs.push([xx, y, xx - h * 0.08, y - h * 0.26]);
+    pen.lines(hs, { w: 0.5, col: PAL.g1, a: 0.45 });
+    c.restore();
+    pen.path(dome, { w: 1, col: PAL.ink, passes: 2, jit: 0.2 });
+    y -= h * 0.26;
+    box(x, y, h * 0.2, h * 0.14);
+    // olhos
+    const ey = y - h * 0.08;
+    for (const s of [-1, 1]) {
+      const ex = x + s * h * 0.05;
+      pen.path([[ex - h * 0.03, ey], [ex, ey - h * 0.018], [ex + h * 0.03, ey]], { w: 0.8, col: PAL.ink, passes: 1, jit: 0 });
+      pen.lines([[ex, ey - h * 0.004, ex + 0.5, ey]], { w: 1.2, col: PAL.ink, wob: 0 });
+    }
+    y -= h * 0.14;
+    // pináculo com anéis
+    const sh = h * 0.36, rings = [];
+    for (let i = 0; i < 13; i++) {
+      const f = i / 13, yy = y - sh * f, ww = h * 0.09 * (1 - f * 0.6);
+      rings.push([x - ww, yy, x + ww, yy]);
+    }
+    c.fillStyle = PAL.paper2;
+    c.beginPath();
+    c.moveTo(x - h * 0.09, y);
+    c.lineTo(x - h * 0.035, y - sh);
+    c.lineTo(x + h * 0.035, y - sh);
+    c.lineTo(x + h * 0.09, y);
+    c.closePath();
+    c.fill();
+    pen.lines(rings, { w: 0.6, col: PAL.ink, a: 0.85, wob: 0.2 });
+    pen.lines([[x - h * 0.09, y, x - h * 0.035, y - sh], [x + h * 0.09, y, x + h * 0.035, y - sh]], { w: 0.9, col: PAL.ink, wob: 0.2 });
+    const top = y - sh;
+    pen.path([[x - h * 0.07, top], [x, top - h * 0.05], [x + h * 0.07, top]], { w: 1, col: PAL.ink, passes: 1, jit: 0 });
+    pen.lines([[x, top - h * 0.05, x, top - h * 0.1]], { w: 1, col: PAL.ink });
+    return [x, top - h * 0.1];
+  }
+
+  /** Marco de pedras empilhadas (cairn). */
+  function cairn(pen, x, baseY, h) {
+    const S = pen.S;
+    let y = baseY, w = h * 0.55;
+    for (let i = 0; i < 6; i++) {
+      const sh = h * (0.12 + S() * 0.05);
+      rock(pen, x + (S() - 0.5) * w * 0.2, y, w * 0.5);
+      y -= sh;
+      w *= 0.8;
+    }
+  }
+
+  const Himalaya = {
+    id: 'himalaia',
+    numeral: 'VI',
+    place: 'Ama Dablam',
+    meta: 'Nepal · 27°52′N 86°51′E',
+    mood: 'rarefeita, espiritual',
+    duration: 30,
+    stopAt: 0.44,
+    stopAtPortrait: 0.5,
+
+    build(env) {
+      const { W, H, res, k } = env;
+      const portrait = H > W * 1.1;
+      const hf = portrait ? 0.82 : 1, wf = portrait ? clamp(H / W / 1.4, 1, 1.7) : 1;
+      const cloudY = H * (portrait ? 0.56 : 0.6);
+      const nP = noise1(rng(6101)), nF = noise1(rng(6102)), nM = noise1(rng(6103)), nB = noise1(rng(6104));
+      const pk = portrait ? 0.55 : 0.6;
+      const peak = (x) => {
+        const u = x / W;
+        const spire = 0.38 * Math.pow(Math.max(0, 1 - Math.abs(u - pk) / (0.11 * wf)), 1.5);
+        const h = 0.1 + spire + 0.17 * bell(u, pk - 0.1 * wf, 0.07 * wf) + 0.2 * bell(u, pk + 0.1 * wf, 0.06 * wf) + 0.03 * ridged(nP, u * 18);
+        return cloudY + H * 0.02 - h * H * hf;
+      };
+      const farR = (x) => {
+        const u = x / W;
+        return cloudY + H * 0.02 - H * hf * (0.12 + 0.12 * bell(u, 0.18, 0.1 * wf) + 0.08 * bell(u, 0.93, 0.08 * wf) + 0.04 * ridged(nF, u * 12));
+      };
+      const moraine = (x) => {
+        const u = x / W;
+        return H * (0.72 - 0.08 * bell(u, 0.22, 0.2) - 0.02 * bell(u, 0.85, 0.15)) + H * 0.012 * fbm(nM, u * 12);
+      };
+      const bankY = (x) => H * (portrait ? 0.86 : 0.85) + H * 0.012 * Math.sin((x / W) * 3 + 0.3) + H * 0.008 * fbm(nB, x * 0.01);
+      const trailY = (x) => bankY(x) + H * 0.034;
+      const peakPts = sample(-6, W + 6, 3, peak), farPts = sample(-6, W + 6, 3, farR), morPts = sample(-6, W + 6, 3, moraine);
+      const stX = W * (portrait ? 0.22 : 0.26), stH = H * 0.16;
+      const poleX = W * (portrait ? 0.9 : 0.86), poleTop = bankY(poleX) - H * 0.36;
+
+      const sky = makeLayer(W, H, res);
+      {
+        const pen = new Pencil(sky.c, 6150, 6151, k);
+        sky.c.fillStyle = PAL.paper;
+        sky.c.fillRect(0, 0, W, H);
+        skyStrokes(pen, W, H * 0.005, H * 0.25, 0.65);
+      }
+      const seaClouds = makeClouds(6160, 5, W, H, k, res, { y0: (cloudY - H * 0.07) / H, dy: 0.008, speed: 2, size: Math.min(W * 0.28, H * 0.36) });
+      const sea = { L: mistSprite(6170, Math.ceil(W * 1.5), Math.ceil(H * 0.12), 90), y: cloudY - H * 0.04, v: 4 * k, a: 1 };
+      const sea2 = { L: mistSprite(6171, Math.ceil(W * 1.5), Math.ceil(H * 0.08), 60), y: cloudY + H * 0.03, v: -3 * k, a: 0.9 };
+      const snow = makeParticles(6180, portrait ? 80 : 130);
+      const birds = makeBirds(6190, 3, W, H, 0.2, 0.32, k, { size: 4 });
+      let spireTop = [stX, moraine(stX) - stH];
+
+      const st = { W, H, land: [], fg: [], wind: 1.3 };
+      withVariants(st, (seedJ) => {
+        const land = makeLayer(W, H, res);
+        const pen = new Pencil(land.c, 6200, seedJ, k);
+        const snowShade = (n, base) => (x, y, sl) => base + 0.95 * smooth(0.15, 1.1, sl) + 0.12 * n(x * 0.03);
+        drawRange(pen, {
+          pts: farPts, base: cloudY + H * 0.05, fill: '#EEE8DC', hatchCol: PAL.g2, hatchA: 0.5, fallA: 0.4,
+          fallEvery: 2, fallDensity: 0.15, hatchEvery: 1, hatchFrom: 0.45, crossFrom: 0.85, maxFall: H * 0.05,
+          lineW: 0.9, lineCol: PAL.g2, lineA: 0.9, shade: snowShade(nF, 0.02),
+        });
+        drawRange(pen, {
+          pts: peakPts, base: cloudY + H * 0.05, fill: '#EFE9DD', hatchCol: PAL.g1, hatchA: 0.6, fallA: 0.45,
+          fallEvery: 1, fallDensity: 0.18, hatchEvery: 1, hatchFrom: 0.38, crossFrom: 0.7, strata: 4, maxFall: H * 0.08,
+          lineW: 1.2, lineCol: PAL.ink, lineA: 0.95, shade: snowShade(nP, 0),
+        });
+        st.land.push(land);
+
+        const fg = makeLayer(W, H, res);
+        const pf = new Pencil(fg.c, 6300, seedJ + 5, k);
+        drawRange(pf, {
+          pts: morPts, base: H + 4, fill: '#E9E1D2', hatchCol: PAL.g1, hatchA: 0.45, fallA: 0.45,
+          fallEvery: 2, fallDensity: 0.6, hatchEvery: 1, hatchFrom: 0.4, crossFrom: 0.75, strata: 7, maxFall: H * 0.05, maxHatch: H * 0.07,
+          lineW: 1.2, lineCol: PAL.ink, lineA: 0.95,
+          shade: (x, y, sl) => 0.4 + 0.4 * Math.tanh(sl * 2) + 0.25 * nM(x * 0.03),
+        });
+        spireTop = stupa(pf, stX, moraine(stX) + 4 * k, stH);
+        drawBank(pf, W, H, bankY, trailY, { rocks: 9, tone: 1.1 });
+        cairn(pf, W * (portrait ? 0.68 : 0.62), bankY(W * 0.62) + 6 * k, H * 0.07);
+        pf.lines([[poleX, bankY(poleX) + 8 * k, poleX + 2 * k, poleTop]], { w: 2, col: PAL.ink });
+        st.fg.push(fg);
+      });
+
+      // cordões de bandeiras de oração (catenárias)
+      const strings = [
+        { a: () => spireTop, b: () => [poleX + 1 * k, poleTop + 4 * k], sag: H * 0.07 },
+        { a: () => spireTop, b: () => [-W * 0.03, H * 0.6], sag: H * 0.04 },
+      ];
+      const tones = [PAL.paper, PAL.g3, PAL.g2, PAL.g1, PAL.paper2];
+
+      st.ground = trailY;
+      st.draw = (ctx, t, v) => {
+        const land = st.land[v] || st.land[0], fg = st.fg[v] || st.fg[0];
+        ctx.drawImage(sky.cv, 0, 0, W, H);
+        drawBirds(ctx, birds, t, W, k, 1);
+        ctx.drawImage(land.cv, 0, 0, W, H);
+        drawMist(ctx, sea, t);
+        drawClouds(ctx, seaClouds, t, W);
+        drawMist(ctx, sea2, t);
+        ctx.drawImage(fg.cv, 0, 0, W, H);
+
+        for (const sgt of strings) {
+          const [x1, y1] = sgt.a(), [x2, y2] = sgt.b();
+          const sag = sgt.sag * (1 + 0.04 * Math.sin(t * 0.9));
+          const at = (f) => [x1 + (x2 - x1) * f, y1 + (y2 - y1) * f + sag * 4 * f * (1 - f)];
+          ctx.beginPath();
+          for (let i = 0; i <= 30; i++) { const p = at(i / 30); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }
+          ctx.strokeStyle = PAL.ink;
+          ctx.lineWidth = 0.8 * k;
+          ctx.stroke();
+          const len = Math.hypot(x2 - x1, y2 - y1), n = Math.floor(len / (15 * k)), fw = 10 * k, fh = 12 * k;
+          for (let i = 1; i < n; i++) {
+            const f0 = i / n, p0 = at(f0), p1 = at(f0 + (fw / len));
+            const w1 = Math.sin(t * 5.5 + i * 0.8) * 3 * k, w2 = Math.sin(t * 7.1 + i * 1.3) * 2 * k;
+            ctx.beginPath();
+            ctx.moveTo(p0[0], p0[1]);
+            ctx.lineTo(p1[0], p1[1]);
+            ctx.lineTo(p1[0] + w1 + 2 * k, p1[1] + fh + w2 * 0.3);
+            ctx.lineTo(p0[0] + w1, p0[1] + fh - w2 * 0.3);
+            ctx.closePath();
+            ctx.fillStyle = tones[i % 5];
+            ctx.fill();
+            ctx.strokeStyle = PAL.ink;
+            ctx.lineWidth = 0.6 * k;
+            ctx.stroke();
+          }
+        }
+
+        // neve leve
+        ctx.beginPath();
+        for (const p of snow) {
+          const y = wrap(p.y * (H + 20) + t * (14 + p.v * 14) * k, H + 20) - 10;
+          const x = wrap(p.x * W + Math.sin(t * 0.6 + p.ph) * 18 * k + t * 6 * k, W + 20) - 10;
+          const r = (0.8 + p.s * 1.2) * k;
+          ctx.moveTo(x + r, y);
+          ctx.arc(x, y, r, 0, TAU);
+        }
+        ctx.fillStyle = PAL.paper;
+        ctx.fill();
+        ctx.strokeStyle = PAL.g2;
+        ctx.lineWidth = 0.5 * k;
+        ctx.stroke();
+      };
+      return st;
+    },
+  };
+
   /** Ordem do roteiro: ao chegar na última, volta para a primeira. */
-  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon];
+  const SCENES = [Fjord, Fuji, Sahara, Patagonia, Amazon, Himalaya];
 
   /*<T>*/
   /* ================================================================
